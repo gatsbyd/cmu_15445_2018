@@ -24,6 +24,9 @@ template <typename T> void LRUReplacer<T>::insertAtHead(std::shared_ptr<DLinkedN
     if (tail == nullptr) {
         tail = node;
     }
+
+    index[node->value] = node;
+    size++;
 }
 
 /*
@@ -33,8 +36,6 @@ template <typename T> void LRUReplacer<T>::Insert(const T &value) {
     Erase(value);
     auto newNode = std::make_shared<DLinkedNode>(value);
     insertAtHead(newNode);
-    index[value] = newNode;
-    size++;
 }
 
 /* If LRU is non-empty, pop the head member from LRU to argument "value", and
@@ -46,6 +47,11 @@ template <typename T> bool LRUReplacer<T>::Victim(T &value) {
     }
     if (head == tail) {
         value = head->value;
+        head = nullptr;
+        tail = nullptr;
+
+        index.erase(value);
+        size--;
         return true;
     }
     value = tail->value;

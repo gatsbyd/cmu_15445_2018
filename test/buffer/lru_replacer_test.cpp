@@ -11,7 +11,7 @@ namespace cmudb {
 
 TEST(LRUReplacerTest, SampleTest) {
   LRUReplacer<int> lru_replacer;
-  
+
   // push element into replacer
   lru_replacer.Insert(1);
   lru_replacer.Insert(2);
@@ -21,7 +21,7 @@ TEST(LRUReplacerTest, SampleTest) {
   lru_replacer.Insert(6);
   lru_replacer.Insert(1);
   EXPECT_EQ(6, lru_replacer.Size());
-  
+
   // pop element from replacer
   int value;
   lru_replacer.Victim(value);
@@ -30,17 +30,43 @@ TEST(LRUReplacerTest, SampleTest) {
   EXPECT_EQ(3, value);
   lru_replacer.Victim(value);
   EXPECT_EQ(4, value);
-  
+
   // remove element from replacer
   EXPECT_EQ(false, lru_replacer.Erase(4));
   EXPECT_EQ(true, lru_replacer.Erase(6));
   EXPECT_EQ(2, lru_replacer.Size());
-  
+
   // pop element from replacer after removal
   lru_replacer.Victim(value);
   EXPECT_EQ(5, value);
   lru_replacer.Victim(value);
   EXPECT_EQ(1, value);
+}
+
+TEST(LRUReplacerTest, SampleTest1) {
+    LRUReplacer<int> lru_replacer;
+    int value;
+
+    EXPECT_EQ(false, lru_replacer.Victim(value));
+
+    lru_replacer.Insert(0);
+    EXPECT_EQ(1, lru_replacer.Size());
+    EXPECT_EQ(true, lru_replacer.Victim(value));
+    EXPECT_EQ(0, value);
+    EXPECT_EQ(false, lru_replacer.Victim(value));
+
+    EXPECT_EQ(false, lru_replacer.Erase(0));
+    EXPECT_EQ(0, lru_replacer.Size());
+
+    lru_replacer.Insert(1);
+    lru_replacer.Insert(1);
+    lru_replacer.Insert(2);
+    lru_replacer.Insert(2);
+    lru_replacer.Insert(1);
+    EXPECT_EQ(2, lru_replacer.Size());
+    EXPECT_EQ(true, lru_replacer.Victim(value));
+    EXPECT_EQ(2, value);
+
 }
 
 } // namespace cmudb

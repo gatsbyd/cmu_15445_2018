@@ -90,7 +90,47 @@ int ExtendibleHash<K, V>::getBucketIndex(const K &key) const {
  * global depth
  */
 template <typename K, typename V>
-void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {}
+void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
+  auto index = getBucketIndex(key);
+  std::shared_ptr<Bucket> targetBucket = bucketTable[index];
+
+  while (targetBucket->items.size() == bucketMaxSize) {
+    if (targetBucket->localDepth == globalDepth) {
+      size_t length = bucketTable.size();
+      for (size_t i = 0; i < length; i++) {
+        bucketTable.push_back(bucketTable[i]);
+      }
+      globalDepth++;
+    }
+    int mask = 1 << targetBucket->localDepth;
+
+    auto zeroBucket = std::make_shared<Bucket>(targetBucket->localDepth + 1);
+    auto oneBucket = std::make_shared<Bucket>(targetBucket->localDepth + 1);
+    for (auto item : targetBucket->items) {
+      size_t hashkey = HashKey(item.first);
+      if (hashkey & mask) {
+        oneBucket->items.insert(item);
+      } else {
+        zeroBucket->items.insert(item);
+      }
+    }
+
+    for (size_t i = 0; i < bucketTable.size(); i++) {
+      if (bucketTable[i] == targetBucket) {
+        if (i & mask) {
+          bucketTable[i] = oneBucket;
+        } else {
+          bucketTable[i] = zeroBucket;
+        }
+      }
+    }
+
+    index = getBucketIndex(key);
+    targetBucket = bucketTable[index];
+  } //end while
+
+  targetBucket->items[key] = value;
+}
 
 template class ExtendibleHash<page_id_t, Page *>;
 template class ExtendibleHash<Page *, std::list<Page *>::iterator>;

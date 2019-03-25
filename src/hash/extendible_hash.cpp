@@ -54,6 +54,9 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
+  //https://en.cppreference.com/w/cpp/thread/mutex
+  std::lock_guard<std::mutex> guard(mutex);
+
   auto index = getBucketIndex(key);
   std::shared_ptr<Bucket> bucket = bucketTable[index];
   if (bucket != nullptr && bucket->items.find(key) != bucket->items.end()) {
@@ -69,6 +72,8 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
+  std::lock_guard<std::mutex> guard(mutex);
+
   auto index = getBucketIndex(key);
   std::shared_ptr<Bucket> bucket = bucketTable[index];
 
@@ -91,6 +96,8 @@ int ExtendibleHash<K, V>::getBucketIndex(const K &key) const {
  */
 template <typename K, typename V>
 void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
+  std::lock_guard<std::mutex> guard(mutex);
+
   auto index = getBucketIndex(key);
   std::shared_ptr<Bucket> targetBucket = bucketTable[index];
 

@@ -14,6 +14,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <mutex>
 
 #include "hash/hash_table.h"
 
@@ -48,5 +49,6 @@ private:
   size_t bucketMaxSize;
   int numBuckets;
   std::vector<std::shared_ptr<Bucket>> bucketTable;
+  std::mutex mutex;
 };
 } // namespace cmudb

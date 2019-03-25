@@ -33,7 +33,9 @@ template <typename T> void LRUReplacer<T>::insertAtHead(std::shared_ptr<DLinkedN
  * Insert value into LRU
  */
 template <typename T> void LRUReplacer<T>::Insert(const T &value) {
-    Erase(value);
+    std::lock_guard<std::mutex> guard(mutex);
+
+    erase(value);
     auto newNode = std::make_shared<DLinkedNode>(value);
     insertAtHead(newNode);
 }
@@ -42,6 +44,8 @@ template <typename T> void LRUReplacer<T>::Insert(const T &value) {
  * return true. If LRU is empty, return false
  */
 template <typename T> bool LRUReplacer<T>::Victim(T &value) {
+    std::lock_guard<std::mutex> guard(mutex);
+
     if (size == 0) {
         return false;
     }
@@ -70,6 +74,14 @@ template <typename T> bool LRUReplacer<T>::Victim(T &value) {
  * return false
  */
 template <typename T> bool LRUReplacer<T>::Erase(const T &value) {
+    std::lock_guard<std::mutex> guard(mutex);
+
+    return erase(value);
+}
+
+template <typename T> size_t LRUReplacer<T>::Size() { return size; }
+
+template <typename T> bool LRUReplacer<T>::erase(const T &value) {
     auto iter = index.find(value);
     if (iter == index.end()) {
         return false;
@@ -96,8 +108,6 @@ template <typename T> bool LRUReplacer<T>::Erase(const T &value) {
     size--;
     return true;
 }
-
-template <typename T> size_t LRUReplacer<T>::Size() { return size; }
 
 template class LRUReplacer<Page *>;
 // test only

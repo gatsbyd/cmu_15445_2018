@@ -10,6 +10,7 @@
 #pragma once
 
 #include <map>
+#include <mutex>
 
 #include "buffer/replacer.h"
 #include "hash/extendible_hash.h"
@@ -44,10 +45,12 @@ private:
 
 
   void insertAtHead(std::shared_ptr<DLinkedNode> node);
+  bool erase(const T &value);
 
   std::shared_ptr<DLinkedNode> head;
   std::shared_ptr<DLinkedNode> tail;
   int size = 0;
+  std::mutex mutex;
   std::map<T, std::shared_ptr<DLinkedNode>> index;
 };
 

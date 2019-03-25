@@ -10,14 +10,17 @@ namespace cmudb {
  * array_size: fixed array size for each bucket
  */
 template <typename K, typename V>
-ExtendibleHash<K, V>::ExtendibleHash(size_t size) {}
+ExtendibleHash<K, V>::ExtendibleHash(size_t size)
+    :globalDepth(0), bucketMaxSize(size), numBuckets(0) {
+    bucketTable.push_back(std::make_shared<Bucket>(0));
+}
 
 /*
  * helper function to calculate the hashing address of input key
  */
 template <typename K, typename V>
 size_t ExtendibleHash<K, V>::HashKey(const K &key) {
-  return 0;
+  return std::hash<K>{}(key);
 }
 
 /*
@@ -26,7 +29,7 @@ size_t ExtendibleHash<K, V>::HashKey(const K &key) {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetGlobalDepth() const {
-  return 0;
+  return globalDepth;
 }
 
 /*
@@ -35,7 +38,7 @@ int ExtendibleHash<K, V>::GetGlobalDepth() const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
-  return 0;
+  return bucketTable[bucket_id]->localDepth;
 }
 
 /*

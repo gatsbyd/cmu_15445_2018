@@ -19,7 +19,7 @@ ExtendibleHash<K, V>::ExtendibleHash(size_t size)
  * helper function to calculate the hashing address of input key
  */
 template <typename K, typename V>
-size_t ExtendibleHash<K, V>::HashKey(const K &key) {
+size_t ExtendibleHash<K, V>::HashKey(const K &key) const {
   return std::hash<K>{}(key);
 }
 
@@ -46,7 +46,7 @@ int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetNumBuckets() const {
-  return 0;
+  return numBuckets;
 }
 
 /*
@@ -54,6 +54,12 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
+  auto index = getBucketIndex(key);
+  std::shared_ptr<Bucket> bucket = bucketTable[index];
+  if (bucket != nullptr && bucket->items.find(key) != bucket->items.end()) {
+    value = bucket->items[key];
+    return true;
+  }
   return false;
 }
 
@@ -63,7 +69,19 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
-  return false;
+  auto index = getBucketIndex(key);
+  std::shared_ptr<Bucket> bucket = bucketTable[index];
+
+  if (bucket == nullptr || bucket->items.find(key) == bucket->items.end()) {
+    return false;
+  }
+  bucket->items.erase(key);
+  return true;
+}
+
+template <typename K, typename V>
+int ExtendibleHash<K, V>::getBucketIndex(const K &key) const {
+    return HashKey(key) & ((1 << globalDepth) - 1);
 }
 
 /*

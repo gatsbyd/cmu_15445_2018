@@ -31,7 +31,7 @@ public:
   // constructor
   ExtendibleHash(size_t size);
   // helper function to generate hash addressing
-  size_t HashKey(const K &key);
+  size_t HashKey(const K &key) const;
   // helper function to get global & local depth
   int GetGlobalDepth() const;
   int GetLocalDepth(int bucket_id) const;
@@ -43,6 +43,7 @@ public:
 
 private:
   // add your own member variables here
+  int getBucketIndex(const K &key) const;
   int globalDepth;
   size_t bucketMaxSize;
   int numBuckets;

@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <map>
+
 #include "buffer/replacer.h"
 #include "hash/extendible_hash.h"
 
@@ -31,6 +33,22 @@ public:
 
 private:
   // add your member variables here
+  struct DLinkedNode {
+    DLinkedNode(T v) :value(v) {
+    }
+
+    T value;
+    std::shared_ptr<DLinkedNode> pre;
+    std::shared_ptr<DLinkedNode> next;
+  };
+
+
+  void insertAtHead(std::shared_ptr<DLinkedNode> node);
+
+  std::shared_ptr<DLinkedNode> head;
+  std::shared_ptr<DLinkedNode> tail;
+  int size = 0;
+  std::map<T, std::shared_ptr<DLinkedNode>> index;
 };
 
 } // namespace cmudb

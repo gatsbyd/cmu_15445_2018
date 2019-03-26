@@ -39,14 +39,38 @@ BufferPoolManager::~BufferPoolManager() {
  * 1. search hash table.
  *  1.1 if exist, pin the page and return immediately
  *  1.2 if no exist, find a replacement entry from either free list or lru
- *      replacer. (NOTE: always find from free list first)
+ * replacer. (NOTE: always find from free list first)
  * 2. If the entry chosen for replacement is dirty, write it back to disk.
  * 3. Delete the entry for the old page from the hash table and insert an
  * entry for the new page.
  * 4. Update page metadata, read page content from disk file and return page
  * pointer
  */
-Page *BufferPoolManager::FetchPage(page_id_t page_id) { return nullptr; }
+Page *BufferPoolManager::FetchPage(page_id_t page_id) {
+    Page *targetPage = nullptr;
+    if (page_table_->Find(page_id, targetPage)) {
+        // already in memory
+        targetPage->pin_count_++;
+        // replacer only record those Page pin_count == 0
+        replacer_->Erase(targetPage);
+        return targetPage;
+    } else {
+        targetPage = findUnusedPage();
+
+        if (targetPage == nullptr) {
+            return targetPage;
+        }
+
+        disk_manager_->ReadPage(page_id, targetPage->GetData());
+        targetPage->pin_count_ = 1;
+        targetPage->page_id_ = page_id;
+
+        page_table_->Insert(page_id, targetPage);
+
+        assert(!targetPage->is_dirty_);
+    }
+    return targetPage;
+}
 
 /*
  * Implementation of unpin page
@@ -87,29 +111,11 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) { return false; }
 Page *BufferPoolManager::NewPage(page_id_t &page_id) {
 
     Page *newPage = nullptr;
-    if (!free_list_->empty()) {
-        // fetch Page from free list first
-        newPage = free_list_->front();
-        free_list_->pop_front();
+    newPage = findUnusedPage();
 
-        assert(newPage->page_id_ == INVALID_PAGE_ID);
-        assert(newPage->pin_count_ == 0);
-        assert(!newPage->is_dirty_);
-    } else {
-        // fetch Page from replacer
-        if (replacer_->Victim(newPage)) {
-            return nullptr;
-        }
-
-        // write newPage back to disk
-        assert(newPage->pin_count_ == 0);
-        page_table_->Remove(newPage->page_id_);
-        if (newPage->is_dirty_) {
-            disk_manager_->WritePage(newPage->page_id_, newPage->GetData());
-        }
+    if (newPage == nullptr) {
+        return newPage;
     }
-
-    newPage->ResetMemory();
 
     // now newPage is clear
     page_id = disk_manager_->AllocatePage();
@@ -121,4 +127,36 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
 
     return newPage;
 }
+
+/**
+ * find unused page from free list first than replacer, return null if not enough memory
+ */
+Page *BufferPoolManager::findUnusedPage() {
+    Page *page;
+    if (!free_list_->empty()) {
+        // fetch Page from free list first
+        page = free_list_->front();
+        free_list_->pop_front();
+
+        assert(page->page_id_ == INVALID_PAGE_ID);
+        assert(page->pin_count_ == 0);
+        assert(!page->is_dirty_);
+    } else {
+        // fetch Page from replacer
+        if (replacer_->Victim(page)) {
+            return nullptr;
+        }
+
+        // write page back to disk
+        assert(page->pin_count_ == 0);
+        page_table_->Remove(page->page_id_);
+        if (page->is_dirty_) {
+            disk_manager_->WritePage(page->page_id_, page->GetData());
+            page->is_dirty_ = false;
+        }
+        page->ResetMemory();
+    }
+    return page;
+}
+
 } // namespace cmudb

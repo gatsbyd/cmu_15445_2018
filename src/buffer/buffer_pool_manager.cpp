@@ -79,7 +79,18 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
  * dirty flag of this page
  */
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
-  return false;
+    Page *page = nullptr;
+    if (!page_table_->Find(page_id, page)) {
+        return false;
+    }
+    page->pin_count_--;
+    if (page->pin_count_ == 0) {
+        replacer_->Insert(page);
+    }
+    if (is_dirty) {
+        page->is_dirty_ = true;
+    }
+    return true;
 }
 
 /*

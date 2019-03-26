@@ -99,7 +99,18 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
  * if page is not found in page table, return false
  * NOTE: make sure page_id != INVALID_PAGE_ID
  */
-bool BufferPoolManager::FlushPage(page_id_t page_id) { return false; }
+bool BufferPoolManager::FlushPage(page_id_t page_id) {
+    assert(page_id != INVALID_PAGE_ID);
+    Page *page = nullptr;
+    if (page_table_->Find(page_id, page)) {
+        return false;
+    }
+    if (page->is_dirty_) {
+        disk_manager_->WritePage(page_id, page->GetData());
+        page->is_dirty_ = false;
+    }
+    return true;
+}
 
 /**
  * User should call this method for deleting a page. This routine will call
@@ -109,7 +120,27 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) { return false; }
  * call disk manager's DeallocatePage() method to delete from disk file. If
  * the page is found within page table, but pin_count != 0, return false
  */
-bool BufferPoolManager::DeletePage(page_id_t page_id) { return false; }
+bool BufferPoolManager::DeletePage(page_id_t page_id) {
+    Page *page = nullptr;
+    if (page_table_->Find(page_id, page)) {
+        if (page->GetPinCount() != 0) {
+            // some User is using this page, can not delete
+            return false;
+        }
+        // reset Page
+        page->page_id_ = INVALID_PAGE_ID;
+        page->pin_count_ = 0;
+        page->is_dirty_ = false;
+        page->ResetMemory();
+
+        replacer_->Erase(page);
+        page_table_->Remove(page_id);
+        free_list_->push_back(page);
+    }
+
+    disk_manager_->DeallocatePage(page_id);
+    return true;
+}
 
 /**
  * User should call this method if needs to create a new page. This routine

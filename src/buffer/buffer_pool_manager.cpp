@@ -84,5 +84,41 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) { return false; }
  * update new page's metadata, zero out memory and add corresponding entry
  * into page table. return nullptr if all the pages in pool are pinned
  */
-Page *BufferPoolManager::NewPage(page_id_t &page_id) { return nullptr; }
+Page *BufferPoolManager::NewPage(page_id_t &page_id) {
+
+    Page *newPage = nullptr;
+    if (!free_list_->empty()) {
+        // fetch Page from free list first
+        newPage = free_list_->front();
+        free_list_->pop_front();
+
+        assert(newPage->page_id_ == INVALID_PAGE_ID);
+        assert(newPage->pin_count_ == 0);
+        assert(!newPage->is_dirty_);
+    } else {
+        // fetch Page from replacer
+        if (replacer_->Victim(newPage)) {
+            return nullptr;
+        }
+
+        // write newPage back to disk
+        assert(newPage->pin_count_ == 0);
+        page_table_->Remove(newPage->page_id_);
+        if (newPage->is_dirty_) {
+            disk_manager_->WritePage(newPage->page_id_, newPage->GetData());
+        }
+    }
+
+    newPage->ResetMemory();
+
+    // now newPage is clear
+    page_id = disk_manager_->AllocatePage();
+    newPage->page_id_ = page_id;
+    newPage->is_dirty_ = true;
+    newPage->pin_count_ = 1;
+
+    page_table_->Insert(newPage->page_id_, newPage);
+
+    return newPage;
+}
 } // namespace cmudb

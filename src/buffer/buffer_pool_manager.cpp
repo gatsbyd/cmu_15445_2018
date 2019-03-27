@@ -47,6 +47,8 @@ BufferPoolManager::~BufferPoolManager() {
  * pointer
  */
 Page *BufferPoolManager::FetchPage(page_id_t page_id) {
+    std::lock_guard<std::mutex> guard(latch_);
+
     Page *targetPage = nullptr;
     if (page_table_->Find(page_id, targetPage)) {
         // already in memory
@@ -79,6 +81,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
  * dirty flag of this page
  */
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
+    std::lock_guard<std::mutex> guard(latch_);
+
     Page *page = nullptr;
     if (!page_table_->Find(page_id, page)) {
         return false;
@@ -100,9 +104,11 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
  * NOTE: make sure page_id != INVALID_PAGE_ID
  */
 bool BufferPoolManager::FlushPage(page_id_t page_id) {
+    std::lock_guard<std::mutex> guard(latch_);
+
     assert(page_id != INVALID_PAGE_ID);
     Page *page = nullptr;
-    if (page_table_->Find(page_id, page)) {
+    if (!page_table_->Find(page_id, page)) {
         return false;
     }
     if (page->is_dirty_) {
@@ -121,6 +127,7 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) {
  * the page is found within page table, but pin_count != 0, return false
  */
 bool BufferPoolManager::DeletePage(page_id_t page_id) {
+    std::lock_guard<std::mutex> guard(latch_);
     Page *page = nullptr;
     if (page_table_->Find(page_id, page)) {
         if (page->GetPinCount() != 0) {
@@ -151,6 +158,7 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
  * into page table. return nullptr if all the pages in pool are pinned
  */
 Page *BufferPoolManager::NewPage(page_id_t &page_id) {
+    std::lock_guard<std::mutex> guard(latch_);
 
     Page *newPage = nullptr;
     newPage = findUnusedPage();
@@ -185,7 +193,7 @@ Page *BufferPoolManager::findUnusedPage() {
         assert(!page->is_dirty_);
     } else {
         // fetch Page from replacer
-        if (replacer_->Victim(page)) {
+        if (!replacer_->Victim(page)) {
             return nullptr;
         }
 
@@ -197,6 +205,7 @@ Page *BufferPoolManager::findUnusedPage() {
             page->is_dirty_ = false;
         }
         page->ResetMemory();
+        page->page_id_ = INVALID_PAGE_ID;
     }
     return page;
 }

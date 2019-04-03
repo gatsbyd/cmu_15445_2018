@@ -49,6 +49,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
  * Helper method to find the first index i so that array[i].first >= key
  * NOTE: This method is only used when generating index iterator
  * 从最简单的情况分析：
+ * 空数组:[]，key:3, 应该返回0,
  * 数组:[1], key:0，应该返回0,
  * 数组:[1], key:2，应该返回1.
  */
@@ -134,8 +135,8 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(
     assert(GetSize() == GetMaxSize() + 1);
 
     // 维护next_page_id_
-    recipient.SetNextPageId(GetNextPageId());
-    SetNextPageId(recipient);
+    recipient->SetNextPageId(GetNextPageId());
+    SetNextPageId(recipient->GetPageId());
 
     // 拷贝
     int lastIndex = GetSize() - 1
@@ -143,15 +144,15 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(
     int i = 0;
     int j = copyStartIndex;
     while (j <= lastIndex) {
-        recipient.array[i].first = array[j].first;
-        recipient.array[i].second = array[j].second;
+        recipient->array[i].first = array[j].first;
+        recipient->array[i].second = array[j].second;
         i++;
         j++;
     }
 
     // 重新设置大小
     SetSize(copyStartIndex);
-    recipient.SetSize(lastIndex - copyStartIndex + 1);
+    recipient->SetSize(lastIndex - copyStartIndex + 1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS

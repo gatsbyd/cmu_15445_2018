@@ -18,20 +18,34 @@ namespace cmudb {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id,
-                                          page_id_t parent_id) {}
+                                          page_id_t parent_id) {
+    SetPageType(INTERNAL_PAGE);
+    SetSize(0);
+    assert(sizeof(BPlusTreeInternalPage) == 24);
+
+    // 预留一个，分裂时用
+    int max_size = (PAGE_SIZE - sizeof(BPlusTreeInternalPage)) / sizeof(MappingType) - 1;
+    SetMaxSize(max_size);
+
+    SetParentPageId(parent_id);
+    SetPageId(page_id);
+}
 /*
  * Helper method to get/set the key associated with input "index"(a.k.a
  * array offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const {
-  // replace with your own code
-  KeyType key;
-  return key;
+    // replace with your own code
+    assert(index > 0 && index < GetSize());
+    return array[index].first;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
+    assert(index > 0 && index < GetMaxSize() + 1);
+    array[index].first = key;
+}
 
 /*
  * Helper method to find and return array index(or offset), so that its value
@@ -39,7 +53,12 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {}
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const {
-  return 0;
+    for (int i = 0; i < GetSize(); i++) {
+        if (value == ValueAt(i)) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 /*
@@ -47,7 +66,10 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const {
  * offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const { return 0; }
+ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const {
+    assert(index >= 0 && index < GetSize())
+    return array[index].second;
+}
 
 /*****************************************************************************
  * LOOKUP
@@ -61,7 +83,37 @@ INDEX_TEMPLATE_ARGUMENTS
 ValueType
 B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
                                        const KeyComparator &comparator) const {
-  return INVALID_PAGE_ID;
+    assert(GetSize() >= 2);
+    // 先找到第一个array[index].first大于等于key的index（从index 1开始）
+    int left = 1;
+    int right = GetSize() - 1;
+    int mid;
+    int compareResult;
+    int targetIndex;
+    while (left <= right) {
+        mid = left + (right - left) / 2;
+        compareResult = comparator(array[mid].first, key);
+        if (compareResult == 0) {
+            left = mid;
+            break;
+        } else if (compareResult < 0) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    targetIndex = left;
+
+    // key比array中所有key都要大
+    if (targetIndex >= GetSize()) {
+        return array[GetSize() - 1].second;
+    }
+
+    if (comparator(array[targetIndex].first, key) == 0) {
+        return array[targetIndex].second;
+    } else {
+        return array[targetIndex - 1].second;
+    }
 }
 
 /*****************************************************************************
@@ -76,7 +128,12 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(
     const ValueType &old_value, const KeyType &new_key,
-    const ValueType &new_value) {}
+    const ValueType &new_value) {
+    array[0].second = old_value;
+    array[1].first = new_key;
+    array[1].second = new_value;
+    SetSize(2);
+}
 /*
  * Insert new_key & new_value pair right after the pair with its value ==
  * old_value
@@ -86,7 +143,18 @@ INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(
     const ValueType &old_value, const KeyType &new_key,
     const ValueType &new_value) {
-  return 0;
+  int index = ValueIndex(old_value);
+  assert(index != -1);
+
+  for (int i = GetSize() - 1; i > index; i--) {
+    array[i + 1].first = array[i].first;
+    array[i + 1].second = array[i].second;
+  }
+  array[i].first = new_key;
+  array[i].second = new_value;
+
+  IncreaseSize(1);
+  return GetSize();
 }
 
 /*****************************************************************************
@@ -98,11 +166,42 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(
     BPlusTreeInternalPage *recipient,
-    BufferPoolManager *buffer_pool_manager) {}
+    BufferPoolManager *buffer_pool_manager) {
+    assert(recipient != nullptr);
+    assert(GetSize() == GetMaxSize() + 1);
+
+    // 拷贝
+    int lastIndex = GetSize() - 1;
+    int start = lastIndex / 2 + 1;
+    int i = 0;
+    int j = start;
+    while (j <= lastIndex) {
+        recipient->array[i].first = array[j].first;
+        recipient->array[i].second = array[j].second;
+        i++;
+        j++;
+    }
+
+    // 维护size
+    SetSize(start);
+    recipient->SetSize(lastIndex - start + 1);
+
+    // 维护孩子节点的parent_page_id
+    for (int i = 0; i < recipient->GetSize(); i++) {
+        auto page_id = recipient->ValueAt(i);
+        auto page = buffer_pool_manager->FetchPage(page_id);
+        BPlusTreePage bp = reinterpret_cast<BPlusTreePage *>(page->GetData());
+        bp->SetParentPageId(recipient->GetPageId());
+        buffer_pool_manager->UnpinPage(page_id, true);
+    }
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyHalfFrom(
-    MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {}
+    MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
+    // 暂时没用到
+    assert(false);
+}
 
 /*****************************************************************************
  * REMOVE

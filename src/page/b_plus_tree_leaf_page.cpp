@@ -20,27 +20,57 @@ namespace cmudb {
  * next page id and set max size
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id) {}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id) {
+    SetPageType(LEAF_PAGE);
+    SetSize(0);
+    assert(sizeof(BPlusTreeLeafPage) == 28);
+
+    // 减一是因为当size == max_size，再插入时可以先插入，再进行拆分
+    int max_size = (PAGE_SIZE - sizeof(BPlusTreeLeafPage)) / sizeof(MappingType) - 1;
+    SetMaxSize(max_size);
+    SetPageId(page_id);
+    SetParentPageId(parent_id);
+}
 
 /**
  * Helper methods to set/get next page id
  */
 INDEX_TEMPLATE_ARGUMENTS
 page_id_t B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const {
-  return INVALID_PAGE_ID;
+  return next_page_id_;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
+    next_page_id_ = next_page_id;
+}
 
 /**
  * Helper method to find the first index i so that array[i].first >= key
  * NOTE: This method is only used when generating index iterator
+ * 从最简单的情况分析：
+ * 数组:[1], key:0，应该返回0,
+ * 数组:[1], key:2，应该返回1.
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(
     const KeyType &key, const KeyComparator &comparator) const {
-  return 0;
+    int left = 0;
+    int right = GetSize() - 1;
+    int mid;
+    int compareResult;
+    while (left <= right) {
+        mid = left + (right - left) / 2;  //(left + right) / 2;有溢出风险
+        compareResult = comparator(array[mid].first, key);
+        if (compareResult == 0) {
+            return mid;
+        } else if (compareResult < 0) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    return left;
 }
 
 /*
@@ -50,8 +80,8 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(
 INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
   // replace with your own code
-  KeyType key;
-  return key;
+  assert(index > 0 && index < GetSize());
+  return array[index].first;
 }
 
 /*
@@ -61,7 +91,8 @@ KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
 INDEX_TEMPLATE_ARGUMENTS
 const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
   // replace with your own code
-  return array[0];
+  assert(index > 0 && index < GetSize());
+  return array[index];
 }
 
 /*****************************************************************************

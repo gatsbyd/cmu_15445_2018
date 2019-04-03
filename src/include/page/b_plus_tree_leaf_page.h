@@ -10,13 +10,13 @@
  * | HEADER | KEY(1) + RID(1) | KEY(2) + RID(2) | ... | KEY(n) + RID(n)
  *  ----------------------------------------------------------------------
  *
- *  Header format (size in byte, 24 bytes in total):
+ *  Header format (size in byte, 28 bytes in total):
  *  ---------------------------------------------------------------------
- * | PageType (4) | CurrentSize (4) | MaxSize (4) | ParentPageId (4) |
+ * | PageType (4) | LSN (4) | CurrentSize (4) | MaxSize (4) |
  *  ---------------------------------------------------------------------
- *  ------------------------------
- * | PageId (4) | NextPageId (4)
- *  ------------------------------
+ *  ----------------------------------------------------
+ * | ParentPageId (4) | PageId (4) | NextPageId (4)
+ *  ----------------------------------------------------
  */
 #pragma once
 #include <utility>

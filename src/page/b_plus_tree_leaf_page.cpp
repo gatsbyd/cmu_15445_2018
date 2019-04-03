@@ -25,7 +25,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id) {
     SetSize(0);
     assert(sizeof(BPlusTreeLeafPage) == 28);
 
-    // 减一是因为当size == max_size，再插入时可以先插入，再进行拆分
+    // 最后一个单独留出来分裂的时候用
     int max_size = (PAGE_SIZE - sizeof(BPlusTreeLeafPage)) / sizeof(MappingType) - 1;
     SetMaxSize(max_size);
     SetPageId(page_id);
@@ -80,7 +80,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(
 INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
   // replace with your own code
-  assert(index > 0 && index < GetSize());
+  assert(index >= 0 && index < GetSize());
   return array[index].first;
 }
 
@@ -91,7 +91,7 @@ KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
 INDEX_TEMPLATE_ARGUMENTS
 const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
   // replace with your own code
-  assert(index > 0 && index < GetSize());
+  assert(index >= 0 && index < GetSize());
   return array[index];
 }
 
@@ -106,7 +106,18 @@ INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key,
                                        const ValueType &value,
                                        const KeyComparator &comparator) {
-  return 0;
+    assert(GetSize() < GetMaxSize() + 1);
+    int targetIndex = KeyIndex(key, comparator);
+
+    for (int i = GetSize() - 1; i >= targetIndex; i--) {
+        array[i + 1].first = array[i].first;
+        array[i + 1].second = array[i].second;
+    }
+
+    array[targetIndex].first = key;
+    array[targetIndex].second = value;
+    IncreaseSize(1);
+    return GetSize();
 }
 
 /*****************************************************************************
@@ -118,10 +129,36 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key,
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(
     BPlusTreeLeafPage *recipient,
-    __attribute__((unused)) BufferPoolManager *buffer_pool_manager) {}
+    __attribute__((unused)) BufferPoolManager *buffer_pool_manager) {
+    assert(recipient != nullptr);
+    assert(GetSize() == GetMaxSize() + 1);
+
+    // 维护next_page_id_
+    recipient.SetNextPageId(GetNextPageId());
+    SetNextPageId(recipient);
+
+    // 拷贝
+    int lastIndex = GetSize() - 1
+    int copyStartIndex = lastIndex / 2 + 1;
+    int i = 0;
+    int j = copyStartIndex;
+    while (j <= lastIndex) {
+        recipient.array[i].first = array[j].first;
+        recipient.array[i].second = array[j].second;
+        i++;
+        j++;
+    }
+
+    // 重新设置大小
+    SetSize(copyStartIndex);
+    recipient.SetSize(lastIndex - copyStartIndex + 1);
+}
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyHalfFrom(MappingType *items, int size) {}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyHalfFrom(MappingType *items, int size) {
+    // 没用到
+    assert(false);
+}
 
 /*****************************************************************************
  * LOOKUP
@@ -134,7 +171,12 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyHalfFrom(MappingType *items, int size) {}
 INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value,
                                         const KeyComparator &comparator) const {
-  return false;
+    int index = KeyIndex(key);
+    if (GetSize() > 0 && index < GetSize() && comparator(key, GetItem(index).first) == 0) {
+        value = GetItem(index).second;
+        return true;
+    }
+    return false;
 }
 
 /*****************************************************************************

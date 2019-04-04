@@ -24,7 +24,9 @@ BPLUSTREE_TYPE::BPlusTree(const std::string &name,
  * Helper function to decide whether current b+tree is empty
  */
 INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::IsEmpty() const { return true; }
+bool BPLUSTREE_TYPE::IsEmpty() const {
+    return root_page_id_ == INVALID_PAGE_ID;
+}
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/
@@ -37,7 +39,15 @@ INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
                               std::vector<ValueType> &result,
                               Transaction *transaction) {
-  return false;
+    BPlusTreeLeafPage *leaf = FindLeafPage(key);
+    if (leaf == nullptr) {
+        return false;
+    }
+    result.resize(1);
+    auto ret = leaf->Lookup(key, result[0], comparator_);
+    // 记得unpin
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
+    return ret;
 }
 
 /*****************************************************************************
@@ -204,11 +214,36 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 /*
  * Find leaf page containing particular key, if leftMost flag == true, find
  * the left most leaf page
+ * 调用者负责Unpin
  */
 INDEX_TEMPLATE_ARGUMENTS
 B_PLUS_TREE_LEAF_PAGE_TYPE *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key,
                                                          bool leftMost) {
-  return nullptr;
+    if (IsEmpty()) {
+        return nullptr;
+    }
+
+    auto page_id = root_page_id_;
+    auto bp = GetPage(page_id);
+    while (!bp->IsLeafPage()) {
+        BPlusTreeInternalPage *internalPage = dynamic_cast<BPlusTreeInternalPage *>(bp);
+        auto next_page_id = internalPage->Lookup(key, comparator_);
+        // 记得unpin
+        buffer_pool_manager_->UnpinPage(page_id);
+        page_id = next_page_id;
+        bp = GetPage(page_id);
+    }
+    return dynamic_cast<BPlusTreeLeafPage *>(bp);
+}
+
+/*
+ * 调用者负责Unpin
+ */
+INDEX_TEMPLATE_ARGUMENTS
+BPlusTreePage *BPLUSTREE_TYPE::GetPage(page_id_t page_id) {
+    auto page = buffer_pool_manager_.FetchPage(page_id);
+    BPlusTreePage *bp = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    return bp;
 }
 
 /*

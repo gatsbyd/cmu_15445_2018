@@ -190,7 +190,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(
     for (int i = 0; i < recipient->GetSize(); i++) {
         auto page_id = recipient->ValueAt(i);
         auto page = buffer_pool_manager->FetchPage(page_id);
-        BPlusTreePage bp = reinterpret_cast<BPlusTreePage *>(page->GetData());
+        BPlusTreePage *bp = reinterpret_cast<BPlusTreePage *>(page->GetData());
         bp->SetParentPageId(recipient->GetPageId());
         buffer_pool_manager->UnpinPage(page_id, true);
     }

@@ -89,6 +89,8 @@ private:
 
   void UpdateRootPageId(int insert_record = false);
 
+  BPlusTreePage *GetPage(page_id_t page_id);
+
   // member variable
   std::string index_name_;
   page_id_t root_page_id_;

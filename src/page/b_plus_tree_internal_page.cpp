@@ -19,7 +19,7 @@ namespace cmudb {
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id,
                                           page_id_t parent_id) {
-    SetPageType(INTERNAL_PAGE);
+    SetPageType(IndexPageType::INTERNAL_PAGE);
     SetSize(0);
     assert(sizeof(BPlusTreeInternalPage) == 24);
 
@@ -67,7 +67,7 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const {
  */
 INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const {
-    assert(index >= 0 && index < GetSize())
+    assert(index >= 0 && index < GetSize());
     return array[index].second;
 }
 
@@ -132,6 +132,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(
     array[0].second = old_value;
     array[1].first = new_key;
     array[1].second = new_value;
+
     SetSize(2);
 }
 /*
@@ -146,7 +147,8 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(
   int index = ValueIndex(old_value);
   assert(index != -1);
 
-  for (int i = GetSize() - 1; i > index; i--) {
+  int i;
+  for (i = GetSize() - 1; i > index; i--) {
     array[i + 1].first = array[i].first;
     array[i + 1].second = array[i].second;
   }

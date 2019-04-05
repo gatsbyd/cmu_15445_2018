@@ -63,7 +63,7 @@ public:
                                            bool leftMost = false);
 
 private:
-  void StartNewTree(const KeyType &key, const ValueType &value);
+  void StartNewTree(const KeyType &key, const ValueType &value, Transaction *transaction);
 
   bool InsertIntoLeaf(const KeyType &key, const ValueType &value,
                       Transaction *transaction = nullptr);
@@ -90,6 +90,8 @@ private:
   void UpdateRootPageId(int insert_record = false);
 
   BPlusTreePage *GetPage(page_id_t page_id);
+
+  void UpdateHeaderPage(std::string index_name, page_id_t root_page_id, bool isInsert);
 
   // member variable
   std::string index_name_;

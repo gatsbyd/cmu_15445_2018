@@ -40,7 +40,7 @@ public:
   void SetNextPageId(page_id_t next_page_id);
   KeyType KeyAt(int index) const;
   int KeyIndex(const KeyType &key, const KeyComparator &comparator) const;
-  const MappingType &GetItem(int index);
+  const MappingType &GetItem(int index) const;
 
   // insert and delete methods
   int Insert(const KeyType &key, const ValueType &value,

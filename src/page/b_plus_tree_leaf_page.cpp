@@ -21,7 +21,7 @@ namespace cmudb {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id) {
-    SetPageType(LEAF_PAGE);
+    SetPageType(IndexPageType::LEAF_PAGE);
     SetSize(0);
     assert(sizeof(BPlusTreeLeafPage) == 28);
 
@@ -90,7 +90,7 @@ KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
  * "index"(a.k.a array offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
+const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) const {
   // replace with your own code
   assert(index >= 0 && index < GetSize());
   return array[index];
@@ -139,7 +139,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(
     SetNextPageId(recipient->GetPageId());
 
     // ¿½±´
-    int lastIndex = GetSize() - 1
+    int lastIndex = GetSize() - 1;
     int copyStartIndex = lastIndex / 2 + 1;
     int i = 0;
     int j = copyStartIndex;
@@ -172,7 +172,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyHalfFrom(MappingType *items, int size) {
 INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value,
                                         const KeyComparator &comparator) const {
-    int index = KeyIndex(key);
+    int index = KeyIndex(key, comparator);
     if (GetSize() > 0 && index < GetSize() && comparator(key, GetItem(index).first) == 0) {
         value = GetItem(index).second;
         return true;

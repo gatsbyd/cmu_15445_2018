@@ -56,6 +56,11 @@ public:
     return os;
   }
 
+    // only for test
+    friend bool operator==(const GenericKey &lhs, const GenericKey &rhs) {
+        return lhs.ToString() == rhs.ToString();
+    }
+
   // actual location of data, extends past the end.
   char data[KeySize];
 };

@@ -37,7 +37,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id,
 INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const {
     // replace with your own code
-    assert(index > 0 && index < GetSize());
+    assert(index >= 0 && index < GetSize());
     return array[index].first;
 }
 
@@ -152,8 +152,8 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(
     array[i + 1].first = array[i].first;
     array[i + 1].second = array[i].second;
   }
-  array[i].first = new_key;
-  array[i].second = new_value;
+  array[index + 1].first = new_key;
+  array[index + 1].second = new_value;
 
   IncreaseSize(1);
   return GetSize();

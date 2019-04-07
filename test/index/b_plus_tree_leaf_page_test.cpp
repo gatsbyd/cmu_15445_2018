@@ -2,10 +2,7 @@
  * b_plus_tree_leaf_page_test.cpp
  */
 
-#include <algorithm>
 #include <cstdio>
-#include <iostream>
-#include <sstream>
 
 #include "gtest/gtest.h"
 #include "buffer/buffer_pool_manager.h"
@@ -45,6 +42,9 @@ TEST(BPlusLeafPageTest, test) {
     EXPECT_EQ(3, leaf->GetSize());
     EXPECT_EQ(2, new_leaf->GetSize());
     EXPECT_EQ(2, leaf->GetNextPageId());
+
+    delete []leaf_ptr;
+    delete []new_leaf_ptr;
 }
 
 }

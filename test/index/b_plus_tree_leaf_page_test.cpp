@@ -19,6 +19,7 @@ TEST(BPlusLeafPageTest, test) {
     leaf->Init(1);
     leaf->SetMaxSize(4);
 
+    // 测试KeyIndex()
     EXPECT_EQ(0, leaf->KeyIndex(3, comparator));
 
     leaf->Insert(1, 1, comparator);
@@ -31,8 +32,9 @@ TEST(BPlusLeafPageTest, test) {
     EXPECT_EQ(4, leaf->GetSize());
     EXPECT_EQ(1, leaf->KeyIndex(2, comparator));
     EXPECT_EQ(3, leaf->KeyIndex(4, comparator));
+    EXPECT_EQ(4, leaf->KeyIndex(100, comparator));
 
-    // maxSize为4，最多可以容纳5个元素，测试分裂
+    // maxSize为4，最多可以容纳5个元素，测试MoveHalfTo()
     leaf->Insert(5, 5, comparator);
     char *new_leaf_ptr = new char[100];
     BPlusTreeLeafPage<int32_t, int32_t, IntComparator> *new_leaf = reinterpret_cast<BPlusTreeLeafPage<int32_t, int32_t, IntComparator> *>(new_leaf_ptr);

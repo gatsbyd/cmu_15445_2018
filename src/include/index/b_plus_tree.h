@@ -91,8 +91,6 @@ private:
 
   BPlusTreePage *GetPage(page_id_t page_id);
 
-  void UpdateHeaderPage(std::string index_name, page_id_t root_page_id, bool isInsert);
-
   // member variable
   std::string index_name_;
   page_id_t root_page_id_;

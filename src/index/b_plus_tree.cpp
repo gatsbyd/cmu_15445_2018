@@ -84,11 +84,12 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value, Tr
         throw std::bad_alloc();
     }
     B_PLUS_TREE_LEAF_PAGE_TYPE *root = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(root_page->GetData());
-    root->Init(root_page_id_, INVALID_PAGE_ID);
+    root->Init(new_page_id, INVALID_PAGE_ID);
     buffer_pool_manager_->UnpinPage(new_page_id, false);
 
     // 更新HeaderPage，在文件的第一页记录<索引名, root_page_id>
-    UpdateHeaderPage(index_name_, root_page_id_, true);
+    root_page_id_ = new_page_id;
+    UpdateRootPageId(true);
 
     InsertIntoLeaf(key, value, transaction);
 }
@@ -181,7 +182,7 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
         new_node->SetParentPageId(new_page_id);
 
         // 更改headerPage
-        UpdateHeaderPage(index_name_, new_page_id, false);
+        UpdateRootPageId(false);
         buffer_pool_manager_->UnpinPage(new_page_id, true);
         return;
     }
@@ -338,20 +339,6 @@ BPlusTreePage *BPLUSTREE_TYPE::GetPage(page_id_t page_id) {
     auto page = buffer_pool_manager_->FetchPage(page_id);
     BPlusTreePage *bp = reinterpret_cast<BPlusTreePage *>(page->GetData());
     return bp;
-}
-
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::UpdateHeaderPage(std::string index_name, page_id_t root_page_id, bool isInsert)
-{
-    root_page_id_ = root_page_id;
-    Page *page = buffer_pool_manager_->FetchPage(HEADER_PAGE_ID);
-    HeaderPage *headerPage = static_cast<HeaderPage *>(page);
-    if (isInsert) {
-        headerPage->InsertRecord(index_name_, root_page_id_);
-    } else {
-        headerPage->UpdateRecord(index_name, root_page_id_);
-    }
-    buffer_pool_manager_->UnpinPage(HEADER_PAGE_ID, true);
 }
 
 /*

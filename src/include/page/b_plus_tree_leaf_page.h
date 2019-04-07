@@ -70,4 +70,12 @@ private:
   page_id_t next_page_id_;
   MappingType array[0];
 };
+
+// only for test
+class IntComparator {
+public:
+    inline int operator()(const int32_t &lhs, const int32_t &rhs) const {
+        return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
+    }
+};
 } // namespace cmudb

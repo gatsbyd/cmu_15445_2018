@@ -16,6 +16,7 @@
 namespace cmudb {
 
 TEST(BPlusTreeTests, InsertTest1) {
+
   // create KeyComparator and index schema
   Schema *key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema);

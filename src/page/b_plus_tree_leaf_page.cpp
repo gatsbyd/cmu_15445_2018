@@ -278,4 +278,10 @@ template class BPlusTreeLeafPage<GenericKey<32>, RID,
                                        GenericComparator<32>>;
 template class BPlusTreeLeafPage<GenericKey<64>, RID,
                                        GenericComparator<64>>;
+
+
+// only for test
+template class BPlusTreeLeafPage<int32_t, int32_t, IntComparator>;
+
+
 } // namespace cmudb

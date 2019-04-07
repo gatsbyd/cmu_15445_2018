@@ -291,7 +291,11 @@ bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
  * @return : index iterator
  */
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() { return INDEXITERATOR_TYPE(); }
+INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() {
+    KeyType invalidKey;
+    auto start_leaf = FindLeafPage(invalidKey, true);
+    return INDEXITERATOR_TYPE(start_leaf, 0, buffer_pool_manager_);
+}
 
 /*
  * Input parameter is low key, find the leaf page that contains the input key
@@ -300,7 +304,21 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() { return INDEXITERATOR_TYPE(); }
  */
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
-  return INDEXITERATOR_TYPE();
+    // @fixme (daihaonan#1#04/07/19): remember to unpin
+    auto start_leaf = FindLeafPage(key);
+    int start_index = 0;
+    if (start_leaf != nullptr) {
+        // KeyIndex()返回的是key应该插入到的index
+        int index = start_leaf->KeyIndex(key, comparator_);
+        if (start_leaf->GetSize() > 0 && index < start_leaf->GetSize() && comparator_(key, start_leaf->GetItem(index).first) == 0) {
+            //key在当前leaf中存在
+            start_index = index;
+        } else {
+            //leaf中不存在key情况下，令index=start_index->GetSize()
+            start_index = start_leaf->GetSize();
+        }
+    }
+    return INDEXITERATOR_TYPE(start_leaf, start_index, buffer_pool_manager_);
 }
 
 /*****************************************************************************
@@ -322,7 +340,12 @@ B_PLUS_TREE_LEAF_PAGE_TYPE *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key,
     BPlusTreePage *bp = GetPage(page_id);
     while (!bp->IsLeafPage()) {
         BPInternalPage *internalPage = static_cast<BPInternalPage *>(bp);
-        page_id_t next_page_id = internalPage->Lookup(key, comparator_);
+        page_id_t next_page_id;
+        if (leftMost) {
+           next_page_id = internalPage->ValueAt(0);
+        } else {
+           next_page_id = internalPage->Lookup(key, comparator_);
+        }
         // 记得unpin
         buffer_pool_manager_->UnpinPage(page_id, false);
         page_id = next_page_id;

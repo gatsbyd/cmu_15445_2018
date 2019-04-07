@@ -12,10 +12,15 @@ namespace cmudb {
  * set your own input parameters
  */
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::IndexIterator() {}
+INDEXITERATOR_TYPE::IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf, int index, BufferPoolManager *bmp)
+    :leaf_(leaf), index_(index), bmp_(bmp) {}
 
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::~IndexIterator() {}
+INDEXITERATOR_TYPE::~IndexIterator() {
+    if (leaf_ != nullptr) {
+        bmp_->UnpinPage(leaf_->GetPageId(), false);
+    }
+}
 
 template class IndexIterator<GenericKey<4>, RID, GenericComparator<4>>;
 template class IndexIterator<GenericKey<8>, RID, GenericComparator<8>>;

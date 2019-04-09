@@ -210,4 +210,14 @@ Page *BufferPoolManager::findUnusedPage() {
     return page;
 }
 
+std::string BufferPoolManager::ToString() const {
+    std::ostringstream stream;
+    stream << "free list size=" << free_list_->size() << ", " << "lru replacer size="
+        << replacer_->Size() << ". ";
+    for (size_t i = 0; i < pool_size_; i++) {
+        stream << "page[" << i << "]:(page_id=" << pages_[i].page_id_ << ", pin count="
+            << pages_[i].pin_count_ << ") ";
+    }
+    return stream.str();
+}
 } // namespace cmudb

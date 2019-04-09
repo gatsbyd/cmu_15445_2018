@@ -83,6 +83,7 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value, Tr
     if (root_page == nullptr) {
         throw std::bad_alloc();
     }
+    LOG_DEBUG("start new tree with root page id=%d\n", new_page_id);
     B_PLUS_TREE_LEAF_PAGE_TYPE *root = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(root_page->GetData());
     root->Init(new_page_id, INVALID_PAGE_ID);
     buffer_pool_manager_->UnpinPage(new_page_id, false);
@@ -116,10 +117,16 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value,
 
     int sz = leaf->GetSize();
     if (sz < leaf->GetMaxSize()) {
-        leaf->Insert(key, value, comparator_);
+        sz = leaf->Insert(key, value, comparator_);
+        buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+        LOG_DEBUG("insert %ld in page %d, size=%d, max size=%d\n", key.ToString(), leaf->GetPageId(), sz, leaf->GetMaxSize());
+        assert(sz <= leaf->GetMaxSize());
     } else {
+        assert(leaf->GetSize() == leaf->GetMaxSize());
+
         leaf->Insert(key, value, comparator_);
         // 分裂
+        LOG_DEBUG("page %d current size=%d, max size=%d, split new page\n", leaf->GetPageId(), leaf->GetSize(), leaf->GetMaxSize());
         B_PLUS_TREE_LEAF_PAGE_TYPE *new_leaf = Split(leaf);
 
         // 将新节点插入父节点
@@ -149,6 +156,7 @@ template <typename N> N *BPLUSTREE_TYPE::Split(N *node) {
     }
 
     N *new_node = reinterpret_cast<N *>(new_page->GetData());
+    new_node->Init(new_page_id, node->GetParentPageId());
     node->MoveHalfTo(new_node, buffer_pool_manager_);
     return new_node;
 }
@@ -169,12 +177,14 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
                                       Transaction *transaction) {
     if (old_node->IsRootPage()) {
         // 创建一个新的内部节点作为根节点
+
         page_id_t new_page_id;
         Page *new_page = buffer_pool_manager_->NewPage(new_page_id);
         if (new_page == nullptr) {
             throw std::bad_alloc();
         }
         BPInternalPage *new_root = reinterpret_cast<BPInternalPage *>(new_page->GetData());
+        new_root->Init(new_page_id);
         new_root->PopulateNewRoot(old_node->GetPageId(), key, new_node->GetPageId());
 
         // 维护parent指针
@@ -182,25 +192,40 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
         new_node->SetParentPageId(new_page_id);
 
         // 更改headerPage
+        LOG_DEBUG("create new page %d as root\n", new_page_id);
+        root_page_id_ = new_page_id;
         UpdateRootPageId(false);
         buffer_pool_manager_->UnpinPage(new_page_id, true);
         return;
     }
-
     page_id_t parent_id = old_node->GetParentPageId();
     BPInternalPage *parent_page = static_cast<BPInternalPage *>(GetPage(parent_id));
+    if (parent_page == nullptr) {
+        throw std::bad_alloc();
+    }
 
     // 维护parent指针
     new_node->SetParentPageId(parent_id);
 
-    assert(parent_page->GetSize() <= parent_page->GetMaxSize());
+    LOG_DEBUG("buffer manager:%s\n", buffer_pool_manager_->ToString().c_str());
+    LOG_DEBUG("parent page %d, size=%d, max size=%d\n", parent_id, parent_page->GetSize(), parent_page->GetMaxSize());
+//    assert(parent_page->GetSize() <= parent_page->GetMaxSize());
     if (parent_page->GetSize() < parent_page->GetMaxSize()) {
         // 父节点还没满，直接插入
-        parent_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
+        LOG_DEBUG("internal page %d, size=%d, max size=%d, is ready to insert\n", parent_id, parent_page->GetSize(), parent_page->GetMaxSize());
+        int sz = parent_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
+        LOG_DEBUG("insert page %d, %d into internal page %d, max size=%d, %s\n", old_node->GetPageId(), new_node->GetPageId(), parent_page->GetPageId(), parent_page->GetMaxSize(), parent_page->ToString(true).c_str());
+        assert(sz <= parent_page->GetMaxSize());
     } else {
         // 父节点也需要拆分
+        // LOG_DEBUG("parent_page size=%d, parent_page max size=%d\n", parent_page->GetSize(), parent_page->GetMaxSize());
+        assert(parent_page->GetSize() == parent_page->GetMaxSize());
+        LOG_DEBUG("internal page %d is full, max size=%d, %s\n", parent_page->GetPageId(), parent_page->GetMaxSize(), parent_page->ToString(true).c_str());
+
         parent_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
         BPInternalPage *new_page = Split(parent_page);
+        assert(parent_page->GetSize() < parent_page->GetMaxSize());
+
         InsertIntoParent(parent_page, new_page->KeyAt(0), new_page, transaction);
         buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
     }

@@ -40,6 +40,9 @@ public:
   bool IsLeafPage() const;
   bool IsRootPage() const;
   void SetPageType(IndexPageType page_type);
+  IndexPageType GetPageType() {
+    return page_type_;
+  }
 
   int GetSize() const;
   void SetSize(int size);

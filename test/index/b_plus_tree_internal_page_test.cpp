@@ -71,6 +71,21 @@ TEST(BPlusInternalPageTest, test) {
     EXPECT_EQ(2, new_ip->GetSize());
     index_key.SetFromInteger(3);
     EXPECT_EQ(index_key, new_ip->KeyAt(0));
+
+    // 测试Remove()，删除后ip指向的数据:[<invalid, p0>, <2, p2>]
+    ip->Remove(1);
+    EXPECT_EQ(2, ip->GetSize());
+    index_key.SetFromInteger(2);
+    EXPECT_EQ(index_key, ip->KeyAt(1));
+
+    bpm->UnpinPage(root_page_id, true);
+    bpm->UnpinPage(p0, true);
+    bpm->UnpinPage(p1, true);
+    bpm->UnpinPage(p2, true);
+    bpm->UnpinPage(p3, true);
+    bpm->UnpinPage(p4, true);
+    delete disk_manager;
+    delete bpm;
 }
 
 }

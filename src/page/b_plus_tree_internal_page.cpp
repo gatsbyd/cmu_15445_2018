@@ -214,7 +214,13 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyHalfFrom(
  * NOTE: store key&value pair continuously after deletion
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {
+    assert(0 <= index && index < GetSize());
+    for (int i = index; i < GetSize() - 1; ++i) {
+        array[i] = array[i + 1];
+    }
+    IncreaseSize(-1);
+}
 
 /*
  * Remove the only key & value pair in internal page and return the value
@@ -223,6 +229,9 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {}
 INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveAndReturnOnlyChild() {
   return INVALID_PAGE_ID;
+    IncreaseSize(-1);
+    assert(GetSize() == 1);
+    return ValueAt(0);
 }
 /*****************************************************************************
  * MERGE
@@ -234,11 +243,48 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveAndReturnOnlyChild() {
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
     BPlusTreeInternalPage *recipient, int index_in_parent,
-    BufferPoolManager *buffer_pool_manager) {}
+    BufferPoolManager *buffer_pool_manager) {
+    assert(GetSize() + recipient->GetSize() < GetMaxSize());
+    assert(GetParentPageId() == recipient->GetParentPageId());
+    assert(GetSize() < GetMinSize());
+
+    // 总是key大paeg的移动到key小的page
+    Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+    if (parent_page == nullptr) {
+        throw std::bad_alloc();
+    }
+
+    assert(parent_page->ValueIndex(GetPageId()) > parent_page->ValueAt(recipient->GetPageId()));
+    array[0].first = parent_page->KeyAt(index_in_parent);
+    buffer_pool_manager->UnpinPage(GetParentPageId(), false);
+
+    recipient->CopyAllFrom(array, GetSize(), buffer_pool_manager);
+
+    // 调整子节点的父节点指针
+    for (int i = 0; i < GetSize(); i++) {
+        page_id_t child_page_id = ValueAt(i);
+        page = buffer_pool_manager->FetchPage(child_page_id);
+        BPInternalPage *child_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+        if (parent_page == nullptr) {
+            throw std::bad_alloc();
+        }
+
+        child_page->SetParentPageId(recipient->GetPageId());
+        buffer_pool_manager->UnpinPage(child_page_id, true);
+    }
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyAllFrom(
-    MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {}
+    MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
+    assert(GetSize() + size <= GetMaxSize());
+    int start = GetSize();
+    for (int i = 0; i < size; ++i) {
+        array[start + i] = *items++;
+    }
+    IncreaseSize(size);
+}
 
 /*****************************************************************************
  * REDISTRIBUTE
@@ -250,11 +296,44 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyAllFrom(
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(
     BPlusTreeInternalPage *recipient,
-    BufferPoolManager *buffer_pool_manager) {}
+    BufferPoolManager *buffer_pool_manager) {
+    assert(GetParentPageId() == recipient->GetParentPageId());
+
+    MappingType pair{KeyAt(1), ValueAt(0)};
+    page_id_t child_page_id = ValueAt(0);
+    array[0].second = ValueAt(1);
+    Remove(1);
+
+    recipient->CopyLastFrom(pair, buffer_pool_manager);
+
+    auto *page = buffer_pool_manager->FetchPage(child_page_id);
+    if (page == nullptr) {
+        throw std::bad_alloc();
+    }
+    auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    child->SetParentPageId(recipient->GetPageId());
+
+    buffer_pool_manager->UnpinPage(child->GetPageId(), true);
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(
-    const MappingType &pair, BufferPoolManager *buffer_pool_manager) {}
+    const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
+    auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
+    if (page == nullptr) {
+        throw std::bad_alloc();
+    }
+    auto parent = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
+
+    auto index = parent->ValueIndex(GetPageId());
+    auto key = parent->KeyAt(index + 1);
+
+    array[GetSize()] = {key, pair.second};
+    IncreaseSize(1);
+    parent->SetKeyAt(index + 1, pair.first);
+
+    buffer_pool_manager->UnpinPage(parent->GetPageId(), true);
+}
 
 /*
  * Remove the last key & value pair from this page to head of "recipient"
@@ -263,12 +342,38 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(
     BPlusTreeInternalPage *recipient, int parent_index,
-    BufferPoolManager *buffer_pool_manager) {}
+    BufferPoolManager *buffer_pool_manager) {
+    assert(GetParentPageId() == recipient->GetParentPageId());
+
+    MappingType last = array[GetSize() - 1];
+    IncreaseSize(-1);
+    page_id_t child_id = last.second;
+
+    recipient->CopyFirstFrom(last, parent_index, buffer_pool_manager);
+
+    Page *page = buffer_pool_manager->FetchPage(child_id);
+    BPInternalPage *child_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+    child_page->SetParentPageId(recipient->GetPageId());
+    buffer_pool_manager->UnpinPage(child_id, true);
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(
     const MappingType &pair, int parent_index,
-    BufferPoolManager *buffer_pool_manager) {}
+    BufferPoolManager *buffer_pool_manager) {
+
+    Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+    if (parent_page == nullptr) {
+        throw std::bad_alloc();
+    }
+    auto tmp = parent_page->KeyAt(parent_index);
+    parent_page->SetKeyAt(parent_index, pair.first);
+
+    InsertNodeAfter(array[0].second, tmp, array[0].second);
+    array[0].second = pair.second;
+    buffer_pool_manager->UnpinPage(GetParentPageId(), true);
+}
 
 /*****************************************************************************
  * DEBUG

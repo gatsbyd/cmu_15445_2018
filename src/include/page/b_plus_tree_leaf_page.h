@@ -53,11 +53,11 @@ public:
   void MoveHalfTo(BPlusTreeLeafPage *recipient,
                   BufferPoolManager *buffer_pool_manager /* Unused */);
   void MoveAllTo(BPlusTreeLeafPage *recipient, int /* Unused */,
-                 BufferPoolManager * /* Unused */);
+                 BufferPoolManager * /* Unused */, const KeyComparator &comparator);
   void MoveFirstToEndOf(BPlusTreeLeafPage *recipient,
-                        BufferPoolManager *buffer_pool_manager);
+                        BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator);
   void MoveLastToFrontOf(BPlusTreeLeafPage *recipient, int parentIndex,
-                         BufferPoolManager *buffer_pool_manager);
+                         BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator);
   // Debug
   std::string ToString(bool verbose = false) const;
 
@@ -69,13 +69,5 @@ private:
                      BufferPoolManager *buffer_pool_manager);
   page_id_t next_page_id_;
   MappingType array[0];
-};
-
-// only for test
-class IntComparator {
-public:
-    inline int operator()(const int32_t &lhs, const int32_t &rhs) const {
-        return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
-    }
 };
 } // namespace cmudb

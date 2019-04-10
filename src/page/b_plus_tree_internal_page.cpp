@@ -299,21 +299,21 @@ std::string B_PLUS_TREE_INTERNAL_PAGE_TYPE::ToString(bool verbose) const {
        << "]<" << GetSize() << "> ";
   }
 
-  int entry = verbose ? 0 : 1;
-  int end = GetSize();
-  bool first = true;
-  while (entry < end) {
-    if (first) {
-      first = false;
-    } else {
-      os << " ";
-    }
-    os << std::dec << array[entry].first.ToString();
-    if (verbose) {
-      os << "(" << array[entry].second << ")";
-    }
-    ++entry;
-  }
+//  int entry = verbose ? 0 : 1;
+//  int end = GetSize();
+//  bool first = true;
+//  while (entry < end) {
+//    if (first) {
+//      first = false;
+//    } else {
+//      os << " ";
+//    }
+//    os << std::dec << array[entry].first.ToString();
+//    if (verbose) {
+//      os << "(" << array[entry].second << ")";
+//    }
+//    ++entry;
+//  }
   return os.str();
 }
 
@@ -328,4 +328,7 @@ template class BPlusTreeInternalPage<GenericKey<32>, page_id_t,
                                            GenericComparator<32>>;
 template class BPlusTreeInternalPage<GenericKey<64>, page_id_t,
                                            GenericComparator<64>>;
+// for test
+template class BPlusTreeInternalPage<int32_t, int32_t,
+                                           IntComparator>;
 } // namespace cmudb

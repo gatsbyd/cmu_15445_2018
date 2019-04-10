@@ -19,7 +19,7 @@ TEST(BPlusLeafPageTest, test) {
     leaf->Init(1);
     leaf->SetMaxSize(4);
 
-    // ²âÊÔKeyIndex()
+    // ²âÊÔInsert(), KeyIndex()
     EXPECT_EQ(0, leaf->KeyIndex(3, comparator));
 
     leaf->Insert(1, 1, comparator);
@@ -44,6 +44,29 @@ TEST(BPlusLeafPageTest, test) {
     EXPECT_EQ(3, leaf->GetSize());
     EXPECT_EQ(2, new_leaf->GetSize());
     EXPECT_EQ(2, leaf->GetNextPageId());
+
+    // ²âÊÔLookup(), µ±Ç°leaf:[(1, 1), (2, 2), (3, 3)], new_leaf:[(4, 4), (5, 5)]
+    int value;
+    EXPECT_TRUE(leaf->Lookup(2, value, comparator));
+    EXPECT_EQ(2, value);
+    EXPECT_FALSE(leaf->Lookup(6, value, comparator));
+
+    // ²âÊÔRemoveAndDeleteRecord()
+    EXPECT_EQ(3, leaf->RemoveAndDeleteRecord(100, comparator));
+    EXPECT_EQ(2, leaf->RemoveAndDeleteRecord(2, comparator));
+    EXPECT_EQ(1, leaf->KeyAt(0));
+    EXPECT_EQ(3, leaf->KeyAt(1));
+    EXPECT_EQ(1, leaf->RemoveAndDeleteRecord(1, comparator));
+    EXPECT_EQ(1, leaf->GetSize());
+    EXPECT_EQ(2, new_leaf->GetSize());
+
+    // ²âÊÔMoveAllTo(), µ±Ç°leaf:[(3, 3)], new_leaf:[(4, 4), (5, 5)]
+    new_leaf->MoveAllTo(leaf, 0, nullptr, comparator);
+    EXPECT_EQ(0, new_leaf->GetSize());
+    EXPECT_EQ(3, leaf->GetSize());
+    EXPECT_EQ(3, leaf->KeyAt(0));
+    EXPECT_EQ(4, leaf->KeyAt(1));
+    EXPECT_EQ(5, leaf->KeyAt(2));
 
     delete []leaf_ptr;
     delete []new_leaf_ptr;

@@ -8,6 +8,7 @@
 #include "common/rid.h"
 #include "page/b_plus_tree_leaf_page.h"
 #include "page/b_plus_tree_internal_page.h"
+#include "common/logger.h"
 
 namespace cmudb {
 
@@ -196,10 +197,8 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(
     const KeyType &key, const KeyComparator &comparator) {
     int index = KeyIndex(key, comparator);
     if (GetSize() > 0 && index < GetSize() && comparator(key, GetItem(index).first) == 0) {
-        for (int i = index + 1; i < GetSize(); i++) {
-            array[i - 1].first = array[i].first;
-            array[i - 1].second = array[i].second;
-        }
+        memmove(array + index, array + index + 1,
+                static_cast<size_t>(GetSize() - 1 - index) * sizeof(MappingType));
         IncreaseSize(-1);
     }
     return GetSize();
@@ -217,15 +216,16 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient,
                                            int, BufferPoolManager *, const KeyComparator &comparator) {
     assert(GetSize() + recipient->GetSize() < GetMaxSize());
     assert(GetParentPageId() == recipient->GetParentPageId());
+
     for (int i = 0; i < GetSize(); i++) {
         MappingType item = GetItem(i);
         recipient->Insert(item.first, item.second, comparator);
-        recipient->IncreaseSize(1);
-        IncreaseSize(-1);
     }
+    IncreaseSize(-1 * GetSize());
     recipient->SetNextPageId(GetNextPageId());
     SetNextPageId(INVALID_PAGE_ID);
 }
+
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyAllFrom(MappingType *items, int size) {
     // 暂时没用到
@@ -245,13 +245,21 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(
     BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator) {
     assert(GetParentPageId() == recipient->GetParentPageId());
     assert(recipient->GetNextPageId() == GetPageId());
+
     MappingType first = GetItem(0);
     recipient->Insert(first.first, first.second, comparator);
 
-    for (int i = 1; i < GetSize(); i++) {
-        array[i-1] = array[i];
-    }
+    memmove(array, array + 1, static_cast<size_t>(GetSize() - 1) * sizeof(MappingType));
     IncreaseSize(-1);
+
+    Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+    if (parent_page == nullptr) {
+        throw std::bad_alloc();
+    }
+    parent_page->SetKeyAt(parent_page->ValueIndex(GetPageId()), GetItem(0).first);
+
+    buffer_pool_manager->UnpinPage(GetParentPageId(), true);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -273,6 +281,9 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(
 
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
     BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+    if (parent_page == nullptr) {
+        throw std::bad_alloc();
+    }
     parent_page->SetKeyAt(parentIndex, last.first);
 
     buffer_pool_manager->UnpinPage(GetParentPageId(), true);

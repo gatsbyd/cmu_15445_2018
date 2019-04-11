@@ -83,7 +83,7 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value, Tr
     if (root_page == nullptr) {
         throw std::bad_alloc();
     }
-    LOG_DEBUG("start new tree with root page id=%d\n", new_page_id);
+    //LOG_DEBUG("start new tree with root page id=%d\n", new_page_id);
     B_PLUS_TREE_LEAF_PAGE_TYPE *root = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(root_page->GetData());
     root->Init(new_page_id, INVALID_PAGE_ID);
     buffer_pool_manager_->UnpinPage(new_page_id, false);
@@ -119,21 +119,18 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value,
     if (sz < leaf->GetMaxSize()) {
         sz = leaf->Insert(key, value, comparator_);
         buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
-        LOG_DEBUG("insert %ld in page %d, size=%d, max size=%d\n", key.ToString(), leaf->GetPageId(), sz, leaf->GetMaxSize());
+        //LOG_DEBUG("insert %ld in page %d, size=%d, max size=%d\n", key.ToString(), leaf->GetPageId(), sz, leaf->GetMaxSize());
         assert(sz <= leaf->GetMaxSize());
     } else {
         assert(leaf->GetSize() == leaf->GetMaxSize());
 
         leaf->Insert(key, value, comparator_);
         // 分裂
-        LOG_DEBUG("page %d current size=%d, max size=%d, split new page\n", leaf->GetPageId(), leaf->GetSize(), leaf->GetMaxSize());
+        //LOG_DEBUG("page %d current size=%d, max size=%d, split new page\n", leaf->GetPageId(), leaf->GetSize(), leaf->GetMaxSize());
         B_PLUS_TREE_LEAF_PAGE_TYPE *new_leaf = Split(leaf);
 
         // 将新节点插入父节点
         InsertIntoParent(leaf, new_leaf->KeyAt(0), new_leaf, transaction);
-
-        buffer_pool_manager_->UnpinPage(new_leaf->GetPageId(), true);
-        buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
     }
 
     return true;
@@ -169,6 +166,7 @@ template <typename N> N *BPLUSTREE_TYPE::Split(N *node) {
  * User needs to first find the parent page of old_node, parent node must be
  * adjusted to take info of new_node into account. Remember to deal with split
  * recursively if necessary.
+ * 负责unpin old_node, new_node
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
@@ -192,42 +190,45 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
         new_node->SetParentPageId(new_page_id);
 
         // 更改headerPage
-        LOG_DEBUG("create new page %d as root\n", new_page_id);
+        //LOG_DEBUG("create new page %d as root\n", new_page_id);
         root_page_id_ = new_page_id;
         UpdateRootPageId(false);
         buffer_pool_manager_->UnpinPage(new_page_id, true);
+        buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
+        buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
         return;
     }
     page_id_t parent_id = old_node->GetParentPageId();
     BPInternalPage *parent_page = static_cast<BPInternalPage *>(GetPage(parent_id));
-    if (parent_page == nullptr) {
-        throw std::bad_alloc();
-    }
 
     // 维护parent指针
     new_node->SetParentPageId(parent_id);
 
-    LOG_DEBUG("buffer manager:%s\n", buffer_pool_manager_->ToString().c_str());
-    LOG_DEBUG("parent page %d, size=%d, max size=%d\n", parent_id, parent_page->GetSize(), parent_page->GetMaxSize());
+    //LOG_DEBUG("buffer manager:%s\n", buffer_pool_manager_->ToString().c_str());
+    //LOG_DEBUG("parent page %d, size=%d, max size=%d\n", parent_id, parent_page->GetSize(), parent_page->GetMaxSize());
 //    assert(parent_page->GetSize() <= parent_page->GetMaxSize());
     if (parent_page->GetSize() < parent_page->GetMaxSize()) {
         // 父节点还没满，直接插入
-        LOG_DEBUG("internal page %d, size=%d, max size=%d, is ready to insert\n", parent_id, parent_page->GetSize(), parent_page->GetMaxSize());
+        //LOG_DEBUG("internal page %d, size=%d, max size=%d, is ready to insert\n", parent_id, parent_page->GetSize(), parent_page->GetMaxSize());
         int sz = parent_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
-        LOG_DEBUG("insert page %d, %d into internal page %d, max size=%d, %s\n", old_node->GetPageId(), new_node->GetPageId(), parent_page->GetPageId(), parent_page->GetMaxSize(), parent_page->ToString(true).c_str());
+        //LOG_DEBUG("insert page %d, %d into internal page %d, max size=%d, %s\n", old_node->GetPageId(), new_node->GetPageId(), parent_page->GetPageId(), parent_page->GetMaxSize(), parent_page->ToString(true).c_str());
         assert(sz <= parent_page->GetMaxSize());
+        buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
+        buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
     } else {
         // 父节点也需要拆分
         // LOG_DEBUG("parent_page size=%d, parent_page max size=%d\n", parent_page->GetSize(), parent_page->GetMaxSize());
         assert(parent_page->GetSize() == parent_page->GetMaxSize());
-        LOG_DEBUG("internal page %d is full, max size=%d, %s\n", parent_page->GetPageId(), parent_page->GetMaxSize(), parent_page->ToString(true).c_str());
+        //LOG_DEBUG("internal page %d is full, max size=%d, %s\n", parent_page->GetPageId(), parent_page->GetMaxSize(), parent_page->ToString(true).c_str());
 
         parent_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
+        buffer_pool_manager_->UnpinPage(old_node->GetPageId(), true);
+        buffer_pool_manager_->UnpinPage(new_node->GetPageId(), true);
+
         BPInternalPage *new_page = Split(parent_page);
         assert(parent_page->GetSize() < parent_page->GetMaxSize());
 
         InsertIntoParent(parent_page, new_page->KeyAt(0), new_page, transaction);
-        buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
     }
 
     buffer_pool_manager_->UnpinPage(parent_id, true);
@@ -274,11 +275,8 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
     decltype(node) sibling = nullptr;
     bool isLeftSibling = FindSibling(node, sibling);
 
-    Page *page = buffer_pool_manager_->FetchPage(node->GetParentPageId());
-    if (page == nullptr) {
-        throw std::bad_alloc();
-    }
-    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+    BPlusTreePage *page = GetPage(node->GetParentPageId());
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page);
     int nodeIndexInParent = parent_page->ValueIndex(node->GetPageId());
 
     if (node->GetSize() + sibling->GetSize() <= node->GetMaxSize()) {
@@ -291,6 +289,9 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
     return false;
 }
 
+/*
+ *  如果返回true，表示找到node左侧的兄弟节点，false表示找到node右侧的兄弟节点
+ */
 INDEX_TEMPLATE_ARGUMENTS
 template <typename N>
 bool BPLUSTREE_TYPE::FindSibling(N *node, N * &sibling) {
@@ -310,8 +311,8 @@ bool BPLUSTREE_TYPE::FindSibling(N *node, N * &sibling) {
         siblingIndex = index - 1;
         isLeftSibling = true;
     }
-    page = buffer_pool_manager_->FetchPage(parent_page->ValueAt(siblingIndex));
-    sibling = reinterpret_cast<N *>(page->GetData());
+    BPlusTreePage *bp = GetPage(parent_page->ValueAt(siblingIndex));
+    sibling = reinterpret_cast<N *>(bp);
     buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), false);
     return isLeftSibling;
 }
@@ -335,18 +336,20 @@ bool BPLUSTREE_TYPE::Coalesce(
     N *&neighbor_node, N *&node,
     BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
     int index, Transaction *transaction) {
-    assert(node->GetSize() + neighbor_node->GetSize() < node->GetMaxSize());
+    assert(node->GetSize() + neighbor_node->GetSize() <= node->GetMaxSize());
     if (isLeftSibling) {
         node->MoveAllTo(neighbor_node, index, buffer_pool_manager_);
 
         // 在父节点中删除node对应的键值对
         buffer_pool_manager_->DeletePage(parent->ValueAt(index));
+        buffer_pool_manager_->UnpinPage(neighbor_node->GetPageId(), true);
         parent->Remove(index);
     } else {
         neighbor_node->MoveAllTo(node, index, buffer_pool_manager_);
 
         // 在父节点中删除neighbor_node对应的键值对
         buffer_pool_manager_->DeletePage(parent->ValueAt(index + 1));
+        buffer_pool_manager_->UnpinPage(neighbor_node->GetPageId(), true);
         parent->Remove(index + 1);
     }
 

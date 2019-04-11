@@ -1,4 +1,5 @@
 #include "buffer/buffer_pool_manager.h"
+#include "common/logger.h"
 
 namespace cmudb {
 
@@ -85,6 +86,9 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
 
     Page *page = nullptr;
     if (!page_table_->Find(page_id, page)) {
+        return false;
+    }
+    if (page->pin_count_ == 0) {
         return false;
     }
     page->pin_count_--;

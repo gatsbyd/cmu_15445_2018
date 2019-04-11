@@ -214,7 +214,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient,
                                            int, BufferPoolManager *) {
-    assert(GetSize() + recipient->GetSize() < GetMaxSize());
+    assert(GetSize() + recipient->GetSize() <= GetMaxSize());
     assert(GetParentPageId() == recipient->GetParentPageId());
     assert(recipient->GetNextPageId() == GetPageId());
 
@@ -251,13 +251,16 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(
     IncreaseSize(-1);
 
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
-    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
-    if (parent_page == nullptr) {
+    if (page == nullptr) {
         throw std::bad_alloc();
     }
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+
     parent_page->SetKeyAt(parent_page->ValueIndex(GetPageId()), GetItem(0).first);
 
     buffer_pool_manager->UnpinPage(GetParentPageId(), true);
+    buffer_pool_manager->UnpinPage(GetPageId(), true);
+    buffer_pool_manager->UnpinPage(recipient->GetPageId(), true);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -279,6 +282,9 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(
     MappingType last = GetItem(GetSize() - 1);
     IncreaseSize(-1);
     recipient->CopyFirstFrom(last, parentIndex, buffer_pool_manager);
+
+    buffer_pool_manager->UnpinPage(GetPageId(), true);
+    buffer_pool_manager->UnpinPage(recipient->GetPageId(), true);
 }
 
 INDEX_TEMPLATE_ARGUMENTS

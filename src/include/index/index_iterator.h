@@ -31,6 +31,7 @@ public:
     if (++index_ >= leaf_->GetSize()) {
         page_id_t next_page_id = leaf_->GetNextPageId();
         if (next_page_id == INVALID_PAGE_ID) {
+            bmp_->UnpinPage(leaf_->GetPageId(), false);
             leaf_ = nullptr;
         } else {
             //更新leaf指向next_page_id对应的叶子节点

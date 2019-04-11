@@ -6,6 +6,7 @@
 
 #include "common/exception.h"
 #include "page/b_plus_tree_internal_page.h"
+#include "common/logger.h"
 
 namespace cmudb {
 /*****************************************************************************
@@ -243,18 +244,18 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
     BPlusTreeInternalPage *recipient, int index_in_parent,
     BufferPoolManager *buffer_pool_manager) {
-    assert(GetSize() + recipient->GetSize() < GetMaxSize());
+    assert(GetSize() + recipient->GetSize() <= GetMaxSize());
     assert(GetParentPageId() == recipient->GetParentPageId());
-    assert(GetSize() < GetMinSize());
+    LOG_DEBUG("size=%d, min Size=%d\n", GetSize(), GetMinSize());
 
     // 总是key大paeg的移动到key小的page
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
-    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
-    if (parent_page == nullptr) {
+    if (page == nullptr) {
         throw std::bad_alloc();
     }
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
 
-    assert(parent_page->ValueIndex(GetPageId()) > parent_page->ValueAt(recipient->GetPageId()));
+    assert(parent_page->ValueIndex(GetPageId()) > parent_page->ValueIndex(recipient->GetPageId()));
     array[0].first = parent_page->KeyAt(index_in_parent);
     buffer_pool_manager->UnpinPage(GetParentPageId(), false);
 
@@ -264,14 +265,17 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
     for (int i = 0; i < GetSize(); i++) {
         page_id_t child_page_id = ValueAt(i);
         page = buffer_pool_manager->FetchPage(child_page_id);
-        BPInternalPage *child_page = reinterpret_cast<BPInternalPage *>(page->GetData());
-        if (parent_page == nullptr) {
+        if (page == nullptr) {
             throw std::bad_alloc();
         }
+        BPInternalPage *child_page = reinterpret_cast<BPInternalPage *>(page->GetData());
 
         child_page->SetParentPageId(recipient->GetPageId());
         buffer_pool_manager->UnpinPage(child_page_id, true);
     }
+
+    buffer_pool_manager->UnpinPage(GetPageId(), true);
+    buffer_pool_manager->UnpinPage(recipient->GetPageId(), true);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -313,6 +317,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(
     child->SetParentPageId(recipient->GetPageId());
 
     buffer_pool_manager->UnpinPage(child->GetPageId(), true);
+    buffer_pool_manager->UnpinPage(GetPageId(), true);
+    buffer_pool_manager->UnpinPage(recipient->GetPageId(), true);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -353,7 +359,10 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(
     Page *page = buffer_pool_manager->FetchPage(child_id);
     BPInternalPage *child_page = reinterpret_cast<BPInternalPage *>(page->GetData());
     child_page->SetParentPageId(recipient->GetPageId());
+
     buffer_pool_manager->UnpinPage(child_id, true);
+    buffer_pool_manager->UnpinPage(GetPageId(), true);
+    buffer_pool_manager->UnpinPage(recipient->GetPageId(), true);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -362,15 +371,17 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(
     BufferPoolManager *buffer_pool_manager) {
 
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
-    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
-    if (parent_page == nullptr) {
+    if (page == nullptr) {
         throw std::bad_alloc();
     }
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+
     auto tmp = parent_page->KeyAt(parent_index);
     parent_page->SetKeyAt(parent_index, pair.first);
 
     InsertNodeAfter(array[0].second, tmp, array[0].second);
     array[0].second = pair.second;
+
     buffer_pool_manager->UnpinPage(GetParentPageId(), true);
 }
 

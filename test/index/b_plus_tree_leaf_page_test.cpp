@@ -61,7 +61,7 @@ TEST(BPlusLeafPageTest, test) {
     EXPECT_EQ(2, new_leaf->GetSize());
 
     // ²âÊÔMoveAllTo(), µ±Ç°leaf:[(3, 3)], new_leaf:[(4, 4), (5, 5)]
-    new_leaf->MoveAllTo(leaf, 0, nullptr, comparator);
+    new_leaf->MoveAllTo(leaf, 0, nullptr);
     EXPECT_EQ(0, new_leaf->GetSize());
     EXPECT_EQ(3, leaf->GetSize());
     EXPECT_EQ(3, leaf->KeyAt(0));

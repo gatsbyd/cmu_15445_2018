@@ -213,14 +213,12 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient,
-                                           int, BufferPoolManager *, const KeyComparator &comparator) {
+                                           int, BufferPoolManager *) {
     assert(GetSize() + recipient->GetSize() < GetMaxSize());
     assert(GetParentPageId() == recipient->GetParentPageId());
+    assert(recipient->GetNextPageId() == GetPageId());
 
-    for (int i = 0; i < GetSize(); i++) {
-        MappingType item = GetItem(i);
-        recipient->Insert(item.first, item.second, comparator);
-    }
+    recipient->CopyAllFrom(array, GetSize());
     IncreaseSize(-1 * GetSize());
     recipient->SetNextPageId(GetNextPageId());
     SetNextPageId(INVALID_PAGE_ID);
@@ -228,8 +226,8 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient,
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyAllFrom(MappingType *items, int size) {
-    // 暂时没用到
-    assert(false);
+    memmove(array + GetSize(), items, static_cast<size_t>(sizeof(MappingType) * size));
+    IncreaseSize(size);
 }
 
 /*****************************************************************************
@@ -242,12 +240,12 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyAllFrom(MappingType *items, int size) {
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(
     BPlusTreeLeafPage *recipient,
-    BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator) {
+    BufferPoolManager *buffer_pool_manager) {
     assert(GetParentPageId() == recipient->GetParentPageId());
     assert(recipient->GetNextPageId() == GetPageId());
 
     MappingType first = GetItem(0);
-    recipient->Insert(first.first, first.second, comparator);
+    recipient->CopyLastFrom(first);
 
     memmove(array, array + 1, static_cast<size_t>(GetSize() - 1) * sizeof(MappingType));
     IncreaseSize(-1);
@@ -263,7 +261,10 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyLastFrom(const MappingType &item) {}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyLastFrom(const MappingType &item) {
+    array[GetSize()] = item;
+    IncreaseSize(1);
+}
 /*
  * Remove the last key & value pair from this page to "recipient" page, then
  * update relavent key & value pair in its parent page.
@@ -271,28 +272,33 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyLastFrom(const MappingType &item) {}
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(
     BPlusTreeLeafPage *recipient, int parentIndex,
-    BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator) {
+    BufferPoolManager *buffer_pool_manager) {
     assert(GetParentPageId() == recipient->GetParentPageId());
     assert(GetNextPageId() == recipient->GetPageId());
 
     MappingType last = GetItem(GetSize() - 1);
-    recipient->Insert(last.first, last.second, comparator);
     IncreaseSize(-1);
-
-    Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
-    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
-    if (parent_page == nullptr) {
-        throw std::bad_alloc();
-    }
-    parent_page->SetKeyAt(parentIndex, last.first);
-
-    buffer_pool_manager->UnpinPage(GetParentPageId(), true);
+    recipient->CopyFirstFrom(last, parentIndex, buffer_pool_manager);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyFirstFrom(
     const MappingType &item, int parentIndex,
-    BufferPoolManager *buffer_pool_manager) {}
+    BufferPoolManager *buffer_pool_manager) {
+
+    memmove(array + 1, array, static_cast<size_t>(GetSize() * sizeof(MappingType)));
+    array[0] = item;
+    IncreaseSize(1);
+
+    Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
+    if (page == nullptr) {
+        throw std::bad_alloc();
+    }
+    BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
+    parent_page->SetKeyAt(parentIndex, item.first);
+
+    buffer_pool_manager->UnpinPage(GetParentPageId(), true);
+}
 
 /*****************************************************************************
  * DEBUG

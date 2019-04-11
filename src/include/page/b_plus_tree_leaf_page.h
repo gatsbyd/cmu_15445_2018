@@ -53,11 +53,11 @@ public:
   void MoveHalfTo(BPlusTreeLeafPage *recipient,
                   BufferPoolManager *buffer_pool_manager /* Unused */);
   void MoveAllTo(BPlusTreeLeafPage *recipient, int /* Unused */,
-                 BufferPoolManager * /* Unused */, const KeyComparator &comparator);
+                 BufferPoolManager * /* Unused */);
   void MoveFirstToEndOf(BPlusTreeLeafPage *recipient,
-                        BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator);
+                        BufferPoolManager *buffer_pool_manager);
   void MoveLastToFrontOf(BPlusTreeLeafPage *recipient, int parentIndex,
-                         BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator);
+                         BufferPoolManager *buffer_pool_manager);
   // Debug
   std::string ToString(bool verbose = false) const;
 

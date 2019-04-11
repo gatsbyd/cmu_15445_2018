@@ -50,6 +50,10 @@ void BPlusTreePage::SetMaxSize(int size) {
 int BPlusTreePage::GetMinSize() const {
     //p486，对于内部节点如果最多有n个指针，最少应该有n/2向上取整个指针
     //对于叶子节点，如果最多有n个值，最少应该有n/2向上取整个值
+    if (IsRootPage() && IsLeafPage()) {
+        // 只有一个叶子节点的树，该叶子节点如果size为0，那么应该调整header page
+        return 1;
+    }
     return IsRootPage() ? 2 : (GetMaxSize() + 1) / 2;
 }
 

@@ -79,17 +79,23 @@ private:
 
   template <typename N>
   bool Coalesce(
+      bool isLeftSibling,
       N *&neighbor_node, N *&node,
       BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
       int index, Transaction *transaction = nullptr);
 
-  template <typename N> void Redistribute(N *neighbor_node, N *node, int index);
+  template <typename N> void Redistribute(bool isLeftSibling, N *neighbor_node, N *node, int index);
 
   bool AdjustRoot(BPlusTreePage *node);
 
   void UpdateRootPageId(int insert_record = false);
 
+  void DeleteRootPageId();
+
   BPlusTreePage *GetPage(page_id_t page_id);
+
+  template <typename N>
+  bool FindSibling(N *node, N * &sibling);
 
   // member variable
   std::string index_name_;

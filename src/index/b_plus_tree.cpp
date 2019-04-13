@@ -585,7 +585,44 @@ void BPLUSTREE_TYPE::DeleteRootPageId() {
  * print out whole b+tree sturcture, rank by rank
  */
 INDEX_TEMPLATE_ARGUMENTS
-std::string BPLUSTREE_TYPE::ToString(bool verbose) { return "Empty tree"; }
+std::string BPLUSTREE_TYPE::ToString(bool verbose) {
+    if (IsEmpty()) {
+        return "Empty tree";
+    }
+    std::queue<BPlusTreePage *> todo, tmp;
+    std::stringstream out;
+    auto node = reinterpret_cast<BPlusTreePage *>(
+        buffer_pool_manager_->FetchPage(root_page_id_));
+    if (node == nullptr) {
+        throw Exception(EXCEPTION_TYPE_INDEX,
+                    "all page are pinned while printing");
+    }
+    todo.push(node);
+    bool first = true;
+    while (!todo.empty()) {
+        node = todo.front();
+    if (first) {
+        first = false;
+        out << "| ";
+    }
+    if (node->IsLeafPage()) {
+        auto page = reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+        out << page->ToString(verbose) << "| ";
+    } else {
+        auto page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(node);
+        out << page->ToString(verbose) << "| ";
+        page->QueueUpChildren(&tmp, buffer_pool_manager_);
+    }
+    todo.pop();
+    if (todo.empty() && !tmp.empty()) {
+        todo.swap(tmp);
+        out << '\n';
+        first = true;
+    }
+    buffer_pool_manager_->UnpinPage(node->GetPageId(), false);
+  }
+  return out.str();
+}
 
 /*
  * This method is used for test only

@@ -41,6 +41,7 @@ enum ExceptionType {
   EXCEPTION_TYPE_STAT = 20,             // stat related
   EXCEPTION_TYPE_CONNECTION = 21,       // connection related
   EXCEPTION_TYPE_SYNTAX = 22,           // syntax related
+  EXCEPTION_TYPE_BUFFER_ALL_PINNED = 23, //buffer page all pinned
 };
 
 class Exception : public std::runtime_error {
@@ -107,6 +108,8 @@ public:
       return "Connection";
     case EXCEPTION_TYPE_SYNTAX:
       return "Syntax";
+    case EXCEPTION_TYPE_BUFFER_ALL_PINNED:
+        return "Page all pinned";
     default:
       return "Unknown";
     }
@@ -339,6 +342,14 @@ class ConnectionException : public Exception {
 public:
   ConnectionException(std::string msg)
       : Exception(EXCEPTION_TYPE_CONNECTION, msg) {}
+};
+
+class BufferPoolManagerException : public Exception {
+    BufferPoolManagerException() = delete;
+
+public:
+    BufferPoolManagerException(std::string msg)
+        : Exception(EXCEPTION_TYPE_BUFFER_ALL_PINNED, msg) {}
 };
 
 } // namespace cmudb

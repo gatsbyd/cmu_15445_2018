@@ -34,6 +34,10 @@ public:
 
   bool DeletePage(page_id_t page_id);
 
+  int GetPagePinCount(const page_id_t &page_id);
+
+  bool AllPageUnpined();
+
   std::string ToString() const;
 
 private:

@@ -246,12 +246,11 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
     BufferPoolManager *buffer_pool_manager) {
     assert(GetSize() + recipient->GetSize() <= GetMaxSize());
     assert(GetParentPageId() == recipient->GetParentPageId());
-    LOG_DEBUG("size=%d, min Size=%d\n", GetSize(), GetMinSize());
 
     // 总是key大paeg的移动到key小的page
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
     if (page == nullptr) {
-        throw std::bad_alloc();
+        throw BufferPoolManagerException(EXCEPTION_INFO);
     }
     BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
 
@@ -266,7 +265,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
         page_id_t child_page_id = ValueAt(i);
         page = buffer_pool_manager->FetchPage(child_page_id);
         if (page == nullptr) {
-            throw std::bad_alloc();
+            throw BufferPoolManagerException(EXCEPTION_INFO);
         }
         BPInternalPage *child_page = reinterpret_cast<BPInternalPage *>(page->GetData());
 
@@ -311,7 +310,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(
 
     auto *page = buffer_pool_manager->FetchPage(child_page_id);
     if (page == nullptr) {
-        throw std::bad_alloc();
+        throw BufferPoolManagerException(EXCEPTION_INFO);
     }
     auto child = reinterpret_cast<BPlusTreePage *>(page->GetData());
     child->SetParentPageId(recipient->GetPageId());
@@ -326,7 +325,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(
     const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
     auto *page = buffer_pool_manager->FetchPage(GetParentPageId());
     if (page == nullptr) {
-        throw std::bad_alloc();
+        throw BufferPoolManagerException(EXCEPTION_INFO);
     }
     auto parent = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
 
@@ -372,7 +371,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(
 
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
     if (page == nullptr) {
-        throw std::bad_alloc();
+        throw BufferPoolManagerException(EXCEPTION_INFO);
     }
     BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
 

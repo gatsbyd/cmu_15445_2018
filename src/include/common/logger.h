@@ -23,6 +23,7 @@
 
 #include <ctime>
 #include <string>
+#include <sstream>
 
 namespace cmudb {
 
@@ -175,6 +176,14 @@ inline void outputLogHeader_(const char *file, int line, const char *func,
   ::fprintf(LOG_OUTPUT_STREAM, "%s [%s:%d:%s] %s - ", time_str, file, line,
             func, type);
 }
+
+inline std::string ExceptionHeader(const char *file, int line, const char *func) {
+    std::ostringstream os;
+    os << "Exception in file:" << file << " function:" << func << " line:" << line;
+    return os.str();
+}
+
+#define EXCEPTION_INFO ExceptionHeader(__FILE__, __LINE__, __FUNCTION__)
 
 } // namespace cmudb
 

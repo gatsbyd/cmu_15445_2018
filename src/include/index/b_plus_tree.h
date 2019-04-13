@@ -92,7 +92,7 @@ private:
 
   void DeleteRootPageId();
 
-  BPlusTreePage *GetPage(page_id_t page_id);
+  BPlusTreePage *GetPage(page_id_t page_id, std::string msg);
 
   template <typename N>
   bool FindSibling(N *node, N * &sibling);

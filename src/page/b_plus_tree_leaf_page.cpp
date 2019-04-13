@@ -252,7 +252,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(
 
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
     if (page == nullptr) {
-        throw std::bad_alloc();
+        throw BufferPoolManagerException(EXCEPTION_INFO);
     }
     BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
 
@@ -298,7 +298,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyFirstFrom(
 
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
     if (page == nullptr) {
-        throw std::bad_alloc();
+        throw BufferPoolManagerException(EXCEPTION_INFO);
     }
     BPInternalPage *parent_page = reinterpret_cast<BPInternalPage *>(page->GetData());
     parent_page->SetKeyAt(parentIndex, item.first);

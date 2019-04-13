@@ -386,6 +386,8 @@ TEST(BPlusTreeTests, ScaleTest) {
   EXPECT_EQ(size, 100);
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
+//  std::cout << bpm->ToString();
+
   delete transaction;
   delete disk_manager;
   delete bpm;

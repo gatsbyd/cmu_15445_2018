@@ -329,7 +329,7 @@ std::string B_PLUS_TREE_LEAF_PAGE_TYPE::ToString(bool verbose) const {
     } else {
       stream << " ";
     }
-    stream << std::dec << array[entry].first;
+    stream << std::dec << array[entry].first.ToString();
     if (verbose) {
       stream << "(" << array[entry].second << ")";
     }
@@ -348,10 +348,5 @@ template class BPlusTreeLeafPage<GenericKey<32>, RID,
                                        GenericComparator<32>>;
 template class BPlusTreeLeafPage<GenericKey<64>, RID,
                                        GenericComparator<64>>;
-
-
-// only for test
-template class BPlusTreeLeafPage<int32_t, int32_t, IntComparator>;
-
 
 } // namespace cmudb

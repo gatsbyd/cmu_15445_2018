@@ -247,7 +247,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
     assert(GetSize() + recipient->GetSize() <= GetMaxSize());
     assert(GetParentPageId() == recipient->GetParentPageId());
 
-    // 总是key大paeg的移动到key小的page
+    // 总是key大page的移动到key小的page
     Page *page = buffer_pool_manager->FetchPage(GetParentPageId());
     if (page == nullptr) {
         throw BufferPoolManagerException(EXCEPTION_INFO);

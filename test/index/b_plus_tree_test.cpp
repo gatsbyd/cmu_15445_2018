@@ -44,6 +44,8 @@ TEST(BPlusTreeTests, InsertTest1) {
     tree.Insert(index_key, rid, transaction);
   }
 
+  LOG_DEBUG("pass insert");
+
   std::vector<RID> rids;
   for (auto key : keys) {
     rids.clear();
@@ -55,6 +57,8 @@ TEST(BPlusTreeTests, InsertTest1) {
     EXPECT_EQ(rids[0].GetSlotNum(), value);
   }
 
+  LOG_DEBUG("pass get");
+
   int64_t start_key = 1;
   int64_t current_key = start_key;
   index_key.SetFromInteger(start_key);
@@ -65,6 +69,8 @@ TEST(BPlusTreeTests, InsertTest1) {
     EXPECT_EQ(location.GetSlotNum(), current_key);
     current_key = current_key + 1;
   }
+
+  LOG_DEBUG("pass iterator");
 
   EXPECT_EQ(current_key, keys.size() + 1);
 

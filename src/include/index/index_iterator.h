@@ -27,22 +27,7 @@ public:
   };
 
   // isEnd()为true的情况下调用，未定义
-  IndexIterator &operator++() {
-    if (++index_ >= leaf_->GetSize()) {
-        page_id_t next_page_id = leaf_->GetNextPageId();
-        if (next_page_id == INVALID_PAGE_ID) {
-            bmp_->UnpinPage(leaf_->GetPageId(), false);
-            leaf_ = nullptr;
-        } else {
-            //更新leaf指向next_page_id对应的叶子节点
-            bmp_->UnpinPage(leaf_->GetPageId(), false);
-            Page *page = bmp_->FetchPage(next_page_id);
-            leaf_ = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page->GetData());
-            index_ = 0;
-        }
-    }
-    return *this;
-  };
+  IndexIterator &operator++();
 
 private:
   // add your own private member variables here

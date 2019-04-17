@@ -34,6 +34,8 @@ namespace cmudb {
 // define page type enum
 enum class IndexPageType { INVALID_INDEX_PAGE = 0, LEAF_PAGE, INTERNAL_PAGE };
 
+enum class OperationType {GET = 0, INSERT, DELETE};
+
 // Abstract class.
 class BPlusTreePage {
 public:
@@ -59,6 +61,8 @@ public:
   void SetPageId(page_id_t page_id);
 
   void SetLSN(lsn_t lsn = INVALID_LSN);
+
+  bool IsSafe(OperationType op);
 
 private:
   // member variable, attributes that both internal and leaf page share

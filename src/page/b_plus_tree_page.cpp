@@ -78,4 +78,15 @@ void BPlusTreePage::SetPageId(page_id_t page_id) {
  */
 void BPlusTreePage::SetLSN(lsn_t lsn) { lsn_ = lsn; }
 
+bool BPlusTreePage::IsSafe(OperationType op) {
+    if (op == OperationType::GET) {
+        return true;
+    } else if (op == OperationType::INSERT) {
+        return GetSize() < GetMaxSize();
+    } else if (op == OperationType::DELETE) {
+        return GetSize() > GetMinSize();
+    }
+    return false;
+}
+
 } // namespace cmudb

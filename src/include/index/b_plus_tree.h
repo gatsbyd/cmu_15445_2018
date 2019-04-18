@@ -13,6 +13,7 @@
 #include <queue>
 #include <vector>
 #include <mutex>
+#include <atomic>
 
 #include "concurrency/transaction.h"
 #include "index/index_iterator.h"
@@ -103,7 +104,7 @@ private:
 
   // member variable
   std::string index_name_;
-  page_id_t root_page_id_;
+  std::atomic<page_id_t> root_page_id_;
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;
   std::mutex root_id_mutex_;

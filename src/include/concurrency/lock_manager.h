@@ -17,7 +17,20 @@
 
 namespace cmudb {
 
+enum class LockMode {SHARED = 0, EXCLUSIVE};
+
 class LockManager {
+    struct Request {
+        Request(txn_id_t id, LockMode m, bool g) :
+            txn_id(id), lock_mode(m), granted(g) {}
+        txn_id_t txn_id;
+        LockMode lock_mode;
+        bool granted;
+    };
+
+    struct WaitList {
+        std::list<Request> list;
+    };
 
 public:
   LockManager(bool strict_2PL) : strict_2PL_(strict_2PL){};
@@ -39,6 +52,9 @@ public:
 
 private:
   bool strict_2PL_;
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  std::unordered_map<RID, WaitList> lock_table_;
 };
 
 } // namespace cmudb

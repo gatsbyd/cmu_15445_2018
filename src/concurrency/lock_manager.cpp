@@ -25,11 +25,12 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
         for (auto it = lock_table_[rid].list.begin();
                 it != lock_table_[rid].list.end(); ++it) {
             if (it->txn_id != txn->GetTransactionId()) {
-                if (it->lock_mode != LockMode::SHARED || !it->granted) {
+                if (it->lock_mode != LockMode::SHARED || it->granted) {
                     return false;
                 }
             } else {
                 cur = &(*it);
+                break;
             }
         }
         return true;
@@ -60,11 +61,12 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
         for (auto it = lock_table_[rid].list.begin();
                 it != lock_table_[rid].list.end(); ++it) {
             if (it->txn_id != txn->GetTransactionId()) {
-                if (!it->granted) {
+                if (it->granted) {
                     return false;
                 }
             } else {
                 cur = &(*it);
+                break;
             }
         }
         return true;

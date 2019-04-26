@@ -16,7 +16,20 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     assert(txn->GetSharedLockSet()->count(rid) == 0);
 
     Request request{txn->GetTransactionId(), LockMode::SHARED, false};
-    lock_table_[rid].list.push_back(request);
+    if (lock_table_.count(rid) == 0) {
+        lock_table_[rid].oldest = txn->GetTransactionId();
+        lock_table_[rid].list.push_back(request);
+    } else {
+        // 如果等待队列中没有排他锁，就不需要检测新老程度了，因为这种情况下共享锁都会被授权
+        // 不会出现等待的情况，也就不会死锁
+        if (lock_table_[rid].exclusive_cnt != 0 && txn->GetTransactionId() > lock_table_[rid].oldest) {
+            txn->SetState(TransactionState::ABORTED);
+            return false;
+        } else {
+            lock_table_[rid].oldest = txn->GetTransactionId();
+            lock_table_[rid].list.push_back(request);
+        }
+    }
 
     // 通过条件：前面全是已授权的shared请求
     Request *cur = nullptr;
@@ -53,8 +66,18 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     assert(txn->GetExclusiveLockSet()->count(rid) == 0);
 
     Request request{txn->GetTransactionId(), LockMode::EXCLUSIVE, false};
-    lock_table_[rid].list.push_back(request);
-
+    if (lock_table_.count(rid) == 0) {
+        lock_table_[rid].oldest = txn->GetTransactionId();
+        lock_table_[rid].list.push_back(request);
+    } else {
+        if (txn->GetTransactionId() > lock_table_[rid].oldest) {
+            txn->SetState(TransactionState::ABORTED);
+            return false;
+        } else {
+            lock_table_[rid].oldest = txn->GetTransactionId();
+            lock_table_[rid].list.push_back(request);
+        }
+    }
     // 通过条件：当前请求之前没有任何已授权的请求
     Request *cur = nullptr;
     cv_.wait(lk, [&]() -> bool {
@@ -73,6 +96,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     });
 
     cur->granted = true;
+    lock_table_[rid].exclusive_cnt++;
     txn->GetExclusiveLockSet()->insert(rid);
 
     // 授权一个排它锁后，无论共享锁还是排它锁都不可能有机会获取，所以不需要notify
@@ -103,6 +127,7 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
 
     auto cur = lock_table_[rid].list.begin();
     cur->lock_mode = LockMode::EXCLUSIVE;
+    lock_table_[rid].exclusive_cnt++;
     txn->GetSharedLockSet()->erase(rid);
     txn->GetExclusiveLockSet()->insert(rid);
     return true;
@@ -130,13 +155,20 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
                 txn->GetSharedLockSet()->erase(rid);
             } else {
                 txn->GetExclusiveLockSet()->erase(rid);
+                lock_table_[rid].exclusive_cnt--;
             }
             lock_table_[rid].list.erase(it);
-
-            cv_.notify_all();
             break;
         }
     }
+    // 更新oldest
+    for (auto it = lock_table_[rid].list.begin();
+            it != lock_table_[rid].list.end(); ++it) {
+        if (it->txn_id < lock_table_[rid].oldest) {
+            lock_table_[rid].oldest = it->txn_id;
+        }
+    }
+    cv_.notify_all();
     return true;
 }
 

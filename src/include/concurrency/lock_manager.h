@@ -29,6 +29,9 @@ class LockManager {
     };
 
     struct WaitList {
+        // transaction id越小说明该transaction创建越早
+        int exclusive_cnt = 0;
+        txn_id_t oldest = -1;
         std::list<Request> list;
     };
 
